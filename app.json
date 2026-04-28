@@ -6,7 +6,9 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "backgroundColor": "#5A37A2",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.yourcompany.knittingcommunity"
@@ -20,13 +22,15 @@
     "web": {
       "bundler": "metro"
     },
+    "scheme": "hamddu",
     "plugins": [
       [
         "expo-image-picker",
         {
           "photosPermission": "앱에서 사진을 선택하기 위해 권한이 필요합니다."
         }
-      ]
+      ],
+      "expo-web-browser"
     ]
   }
 }
