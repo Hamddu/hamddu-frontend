@@ -7,15 +7,15 @@ podfile_properties = JSON.parse(File.read(File.join(__dir__, 'Podfile.properties
 def ccache_enabled?(podfile_properties)
   # Environment variable takes precedence
   return ENV['USE_CCACHE'] == '1' if ENV['USE_CCACHE']
-  
+
   # Fall back to Podfile properties
   podfile_properties['apple.ccacheEnabled'] == 'true'
 end
 
-ENV['RCT_NEW_ARCH_ENABLED'] ||= '0' if podfile_properties['newArchEnabled'] == 'false'
 ENV['EX_DEV_CLIENT_NETWORK_INSPECTOR'] ||= podfile_properties['EX_DEV_CLIENT_NETWORK_INSPECTOR']
-ENV['RCT_USE_RN_DEP'] ||= '1' if podfile_properties['ios.buildReactNativeFromSource'] != 'true' && podfile_properties['newArchEnabled'] != 'false'
-ENV['RCT_USE_PREBUILT_RNCORE'] ||= '1' if podfile_properties['ios.buildReactNativeFromSource'] != 'true' && podfile_properties['newArchEnabled'] != 'false'
+ENV['RCT_USE_RN_DEP'] ||= '1' if podfile_properties['ios.buildReactNativeFromSource'] != 'true'
+ENV['RCT_USE_PREBUILT_RNCORE'] ||= '1' if podfile_properties['ios.buildReactNativeFromSource'] != 'true'
+ENV['RCT_HERMES_V1_ENABLED'] ||= '1' if podfile_properties['expo.useHermesV1'] == 'true'
 platform :ios, podfile_properties['ios.deploymentTarget'] || '15.1'
 
 prepare_react_native_project!
@@ -27,7 +27,10 @@ target 'app' do
     config_command = ['node', '-e', "process.argv=['', '', 'config'];require('@react-native-community/cli').run()"];
   else
     config_command = [
-      'npx',
+      'node',
+      '--no-warnings',
+      '--eval',
+      'require(\'expo/bin/autolinking\')',
       'expo-modules-autolinking',
       'react-native-config',
       '--json',
@@ -56,25 +59,5 @@ target 'app' do
       :mac_catalyst_enabled => false,
       :ccache_enabled => ccache_enabled?(podfile_properties),
     )
-    # Fix missing RCTReactNativeFactoryDelegate protocol for Xcode 26
-    ex_delegate_path = "#{installer.sandbox.root}/Headers/Public/Expo/Expo/EXAppDelegateWrapper.h"
-    if File.exist?(ex_delegate_path)
-      File.chmod(0644, ex_delegate_path)
-      content = File.read(ex_delegate_path)
-      content = content.gsub(', RCTReactNativeFactoryDelegate', '')
-      File.write(ex_delegate_path, content)
-    end
-
-    # Fix fmt consteval issue with Xcode 26
-    base_h_path = "#{installer.sandbox.root}/fmt/include/fmt/base.h"
-    if File.exist?(base_h_path)
-      File.chmod(0644, base_h_path)
-      content = File.read(base_h_path)
-      content = content.gsub(
-        "#elif defined(__cpp_consteval)\n#  define FMT_USE_CONSTEVAL 1",
-        "#elif defined(__cpp_consteval)\n#  define FMT_USE_CONSTEVAL 0"
-      )
-      File.write(base_h_path, content)
-    end
   end
 end
