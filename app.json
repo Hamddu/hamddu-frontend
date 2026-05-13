@@ -11,13 +11,19 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourcompany.knittingcommunity"
+      "bundleIdentifier": "com.yourcompany.knittingcommunity",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#5A37A2"
       },
-      "package": "com.yourcompany.knittingcommunity"
+      "package": "com.yourcompany.knittingcommunity",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro"
@@ -31,6 +37,11 @@
         }
       ],
       "expo-web-browser"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "5e80d954-4642-498a-a372-fe2def8720bf"
+      }
+    }
   }
 }

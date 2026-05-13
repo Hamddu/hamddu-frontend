@@ -4,8 +4,8 @@
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web"
   },
   "dependencies": {
@@ -17,6 +17,7 @@
     "@tanstack/react-virtual": "^3.13.16",
     "axios": "^1.15.2",
     "expo": "~54.0.0",
+    "expo-dev-client": "~6.0.21",
     "expo-image-picker": "~17.0.0",
     "expo-linking": "~8.0.12",
     "expo-status-bar": "~2.1.0",
@@ -28,6 +29,8 @@
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.6.0",
     "react-native-web": "^0.21.0",
+    "react-native-webview": "^13.16.1",
+    "react-native-youtube-iframe": "^2.4.1",
     "zustand": "^5.0.9"
   },
   "devDependencies": {

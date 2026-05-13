@@ -42,6 +42,7 @@ export default function SurveyScreen() {
   const isValid = age && gender && interests && ability;
 
   async function handleSubmit() {
+    console.log('submit:', { age, gender, interests, ability, isValid });
     if (!isValid) return;
     setLoading(true);
     try {
@@ -95,7 +96,7 @@ export default function SurveyScreen() {
         mode="contained"
         onPress={handleSubmit}
         loading={loading}
-        disabled={!isValid || loading}
+        disabled={loading}
         style={styles.button}
         buttonColor="#5A37A2"
       >
