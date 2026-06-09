@@ -14,7 +14,8 @@ export default function CommentItem({
   currentUser = "뜨개왕초보",
   onDelete,
 }: CommentItemProps) {
-  const isOwner = comment.author === currentUser;
+  const authorName = comment.author?.nickname ?? '익명';
+  const isOwner = authorName === currentUser;
   const timeAgo = getTimeAgo(comment.createdAt);
 
   return (
@@ -27,10 +28,10 @@ export default function CommentItem({
       />
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.author}>{comment.author}</Text>
+          <Text style={styles.author}>{authorName}</Text>
           <Text style={styles.time}>{timeAgo}</Text>
         </View>
-        <Text style={styles.text}>{comment.content}</Text>
+        <Text style={styles.text}>{comment.body}</Text>
       </View>
       {isOwner && onDelete && (
         <IconButton
@@ -45,7 +46,7 @@ export default function CommentItem({
 }
 
 // 시간 차이를 계산하는 헬퍼 함수
-function getTimeAgo(date: Date): string {
+function getTimeAgo(date: Date | string): string {
   const now = new Date();
   const diffMs = now.getTime() - new Date(date).getTime();
   const diffMins = Math.floor(diffMs / 60000);
@@ -58,8 +59,8 @@ function getTimeAgo(date: Date): string {
   if (diffDays < 7) return `${diffDays}일 전`;
 
   // 날짜 표시
-  const dateObj = new Date(date);
-  return `${dateObj.getMonth() + 1}월 ${dateObj.getDate()}일`;
+  const d = new Date(date);
+  return `${d.getMonth() + 1}월 ${d.getDate()}일`;
 }
 
 const styles = StyleSheet.create({

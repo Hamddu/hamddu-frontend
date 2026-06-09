@@ -1,150 +1,215 @@
 import React from "react";
-import { View, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
 import {
-  Avatar,
-  Title,
-  Paragraph,
-  Card,
-  List,
-  Divider,
+  View,
   Text,
-} from "react-native-paper";
-import { usePostsByAuthor } from "../hooks/usePosts";
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  Clipboard,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useQuery } from "@tanstack/react-query";
+import { useAuthStore } from "../store/authStore";
+import { getMyProfile } from "../api/users.api";
+import { xpApi, pointsApi, challengesApi } from "../services/api";
+
+function getTimeAgo(dateStr: string): string {
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  const d = Math.floor(diffMs / 86400000);
+  if (d === 0) return "오늘";
+  if (d === 1) return "어제";
+  const dt = new Date(dateStr);
+  return `${dt.getMonth() + 1}월 ${dt.getDate()}일`;
+}
 
 export default function ProfileScreen() {
-  const currentUser = "뜨개왕초보"; // Example user
-  const { data: myPosts, isLoading } = usePostsByAuthor(currentUser);
+  const logout = useAuthStore((s) => s.logout);
 
-  const totalLikes = myPosts?.reduce((sum, post) => sum + post.likes, 0) || 0;
+  const { data: profile, isLoading: profileLoading } = useQuery({
+    queryKey: ["profile", "me"],
+    queryFn: getMyProfile,
+  });
+  const { data: xpWallet } = useQuery({
+    queryKey: ["xp", "wallet"],
+    queryFn: xpApi.getWallet,
+  });
+  const { data: pointsWallet } = useQuery({
+    queryKey: ["points", "wallet"],
+    queryFn: pointsApi.getWallet,
+  });
+  const { data: myChallenges = [] } = useQuery({
+    queryKey: ["challenges", "my"],
+    queryFn: challengesApi.getMyChallenges,
+  });
+
+  if (profileLoading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <ActivityIndicator size="large" color="#FF7325" style={{ marginTop: 40 }} />
+      </SafeAreaView>
+    );
+  }
+
+  const level = xpWallet?.level ?? 1;
+  const currentXp = xpWallet?.currentLevelXp ?? 0;
+  const nextXp = xpWallet?.nextLevelXp ?? 100;
+  const xpPct = nextXp > 0 ? Math.min((currentXp / nextXp) * 100, 100) : 0;
+  const points = pointsWallet?.balance ?? 0;
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Avatar.Image
-          size={80}
-          source={{ uri: "https://i.pravatar.cc/150?img=12" }}
-        />
-        <Title style={styles.name}>뜨개왕초보</Title>
-        <Paragraph style={styles.bio}>
-          뜨개질을 사랑하는 초보자입니다 🧶
-        </Paragraph>
-      </View>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <View style={styles.header}>
+          <Text style={styles.screenTitle}>마이</Text>
+          <TouchableOpacity style={styles.settingsBtn}>
+            <Text style={styles.settingsIcon}>⚙️</Text>
+          </TouchableOpacity>
+        </View>
 
-      <Card style={styles.statsCard}>
-        <Card.Content style={styles.stats}>
-          <View style={styles.stat}>
-            <Title>{myPosts?.length || 0}</Title>
-            <Paragraph>작품</Paragraph>
+        {/* 유저 카드 */}
+        <View style={styles.userCard}>
+          <View style={styles.avatarWrap}>
+            <Text style={styles.avatarEmoji}>🐹</Text>
+            <View style={styles.levelBadge}>
+              <Text style={styles.levelText}>Lv.{level}</Text>
+            </View>
           </View>
-          <View style={styles.stat}>
-            <Title>{totalLikes}</Title>
-            <Paragraph>좋아요</Paragraph>
+          <View style={styles.userInfo}>
+            <Text style={styles.username}>{profile?.nickname ?? '닉네임 없음'}</Text>
+            <View style={styles.xpRow}>
+              <View style={styles.xpLabels}>
+                <Text style={styles.xpLabel}>XP {currentXp} / {nextXp}</Text>
+                <Text style={styles.xpNext}>다음 레벨까지 {nextXp - currentXp}</Text>
+              </View>
+              <View style={styles.xpBar}>
+                <View style={[styles.xpFill, { width: `${xpPct}%` as any }]} />
+              </View>
+            </View>
           </View>
-          <View style={styles.stat}>
-            <Title>24</Title>
-            <Paragraph>팔로워</Paragraph>
+        </View>
+
+        {/* 포인트 / 인증 수 */}
+        <View style={styles.statsCard}>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{points.toLocaleString()}</Text>
+            <Text style={styles.statStars}>★ POINT</Text>
           </View>
-        </Card.Content>
-      </Card>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, styles.statValueOrange]}>
+              {myChallenges.length}
+            </Text>
+            <Text style={styles.statLabel}>인증 완료</Text>
+          </View>
+        </View>
 
-      <Title style={styles.sectionTitle}>내 작품</Title>
-      {myPosts?.map((post: any) => (
-        <List.Item
-          key={post.id}
-          title={post.title}
-          description={`좋아요 ${post.likes}`}
-          left={(props) => <List.Icon {...props} icon="image" />}
-          style={styles.listItem}
-        />
-      ))}
+        {/* 나의 인증 게시글 */}
+        <View style={styles.certSection}>
+          <View style={styles.certSectionHeader}>
+            <View>
+              <Text style={styles.certSectionTitle}>나의 인증 게시글</Text>
+              <Text style={styles.certSectionSub}>튜토리얼을 완료할 때마다 자동으로 모여요</Text>
+            </View>
+            <Text style={styles.certSectionAll}>전체 {myChallenges.length}</Text>
+          </View>
 
-      <Divider style={styles.divider} />
+          {myChallenges.length === 0 ? (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyText}>아직 인증한 튜토리얼이 없어요 🐹</Text>
+            </View>
+          ) : (
+            <View style={styles.certGrid}>
+              {myChallenges.slice(0, 6).map((item) => (
+                <View key={item.id} style={styles.certGridItem}>
+                  <View style={styles.certThumb}>
+                    <Text style={styles.certThumbText}>🧶</Text>
+                  </View>
+                  <View style={styles.certItemInfo}>
+                    <Text style={styles.certItemTut} numberOfLines={1}>
+                      {item.content?.title ?? item.title ?? '인증'}
+                    </Text>
+                    <Text style={styles.certItemDate}>{getTimeAgo(item.createdAt)}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
 
-      <Title style={styles.sectionTitle}>설정</Title>
-      <List.Item
-        title="프로필 수정"
-        left={(props) => <List.Icon {...props} icon="account-edit" />}
-        onPress={() => {}}
-      />
-      <List.Item
-        title="알림 설정"
-        left={(props) => <List.Icon {...props} icon="bell" />}
-        onPress={() => {}}
-      />
-      <List.Item
-        title="로그아웃"
-        left={(props) => <List.Icon {...props} icon="logout" />}
-        onPress={() => {}}
-      />
-    </ScrollView>
+        <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
+          <Text style={styles.logoutBtnText}>로그아웃</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.devBtn}
+          onPress={() => {
+            const token = useAuthStore.getState().accessToken;
+            if (token) {
+              Clipboard.setString(token);
+              Alert.alert("토큰 복사됨", token);
+            }
+          }}
+        >
+          <Text style={styles.devBtnText}>🔑 토큰 복사 (DEV)</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
+const PRIMARY = "#FF7325";
+const PRIMARY_SOFT = "#FFE6D6";
+const INK1 = "#1A1A1A";
+const INK2 = "#404040";
+const INK3 = "#8A8A8A";
+const LINE = "#ECECEC";
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F5F5F5",
-  },
-  header: {
-    alignItems: "center",
-    padding: 24,
-    backgroundColor: "#FFFFFF",
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    shadowColor: "#5A37A2",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  name: {
-    marginTop: 12,
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#333333",
-  },
-  bio: {
-    color: "#999999",
-    textAlign: "center",
-    marginTop: 8,
-    fontSize: 14,
-  },
-  statsCard: {
-    margin: 16,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    shadowColor: "#5A37A2",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
-    padding: 4,
-  },
-  stats: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-  },
-  stat: {
-    alignItems: "center",
-    paddingVertical: 8,
-  },
-  sectionTitle: {
-    marginLeft: 16,
-    marginTop: 16,
-    marginBottom: 12,
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#5A37A2",
-  },
-  listItem: {
-    backgroundColor: "#FFFFFF",
-    marginHorizontal: 16,
-    marginVertical: 4,
-    borderRadius: 12,
-  },
-  divider: {
-    marginVertical: 16,
-    backgroundColor: "#E0E0E0",
-    height: 1,
-  },
+  safeArea: { flex: 1, backgroundColor: "#FFFFFF" },
+  container: { flex: 1, backgroundColor: "#FFFFFF" },
+  content: { paddingBottom: 40 },
+  header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingTop: 8, paddingBottom: 6 },
+  screenTitle: { flex: 1, fontSize: 22, fontWeight: "800", color: INK1, letterSpacing: -0.4 },
+  settingsBtn: { padding: 8 },
+  settingsIcon: { fontSize: 18 },
+  userCard: { flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: "#fff", borderRadius: 20, padding: 18, marginHorizontal: 20, marginBottom: 12, borderWidth: 1, borderColor: LINE },
+  avatarWrap: { width: 76, height: 76, borderRadius: 38, backgroundColor: PRIMARY_SOFT, alignItems: "center", justifyContent: "center", position: "relative" },
+  avatarEmoji: { fontSize: 36 },
+  levelBadge: { position: "absolute", bottom: -2, right: -2, backgroundColor: PRIMARY, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, borderWidth: 2, borderColor: "#fff" },
+  levelText: { fontSize: 10, fontWeight: "800", color: "#fff" },
+  userInfo: { flex: 1, minWidth: 0 },
+  username: { fontSize: 18, fontWeight: "800", color: INK1, letterSpacing: -0.3, marginBottom: 8 },
+  xpRow: { gap: 3 },
+  xpLabels: { flexDirection: "row", justifyContent: "space-between", marginBottom: 3 },
+  xpLabel: { fontSize: 10, color: INK3, fontWeight: "700" },
+  xpNext: { fontSize: 10, color: PRIMARY, fontWeight: "700" },
+  xpBar: { height: 6, backgroundColor: LINE, borderRadius: 3, overflow: "hidden" },
+  xpFill: { height: "100%", backgroundColor: PRIMARY, borderRadius: 3 },
+  statsCard: { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 16, padding: 18, marginHorizontal: 20, marginBottom: 12, borderWidth: 1, borderColor: LINE },
+  statItem: { flex: 1, alignItems: "center" },
+  statValue: { fontSize: 30, fontWeight: "800", color: INK1, letterSpacing: -1 },
+  statValueOrange: { color: PRIMARY },
+  statStars: { fontSize: 11, color: PRIMARY, fontWeight: "700", marginTop: 2 },
+  statLabel: { fontSize: 11, color: INK3, fontWeight: "700", marginTop: 2 },
+  statDivider: { width: 1, alignSelf: "stretch", backgroundColor: LINE, marginVertical: 4 },
+  certSection: { paddingHorizontal: 20, marginBottom: 20 },
+  certSectionHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 },
+  certSectionTitle: { fontSize: 16, fontWeight: "800", color: INK1, letterSpacing: -0.3 },
+  certSectionSub: { fontSize: 11, color: INK3, marginTop: 2 },
+  certSectionAll: { fontSize: 11, fontWeight: "700", color: PRIMARY },
+  certGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  certGridItem: { width: "30%", flexGrow: 1, backgroundColor: "#fff", borderRadius: 12, overflow: "hidden", borderWidth: 1, borderColor: LINE },
+  certThumb: { height: 96, backgroundColor: "#F2F2F2", alignItems: "center", justifyContent: "center" },
+  certThumbText: { fontSize: 28 },
+  certItemInfo: { padding: 8 },
+  certItemTut: { fontSize: 11, fontWeight: "800", color: INK1 },
+  certItemDate: { fontSize: 10, color: INK3, marginTop: 1 },
+  emptyBox: { backgroundColor: "#fff", borderRadius: 14, padding: 24, alignItems: "center", borderWidth: 1, borderColor: LINE },
+  emptyText: { fontSize: 13, color: INK3, fontWeight: "600" },
+  logoutBtn: { marginHorizontal: 20, height: 48, borderRadius: 12, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center" },
+  logoutBtnText: { fontSize: 14, fontWeight: "700", color: INK2 },
+  devBtn: { marginHorizontal: 20, marginTop: 8, height: 40, borderRadius: 12, borderWidth: 1, borderColor: "#E0E0E0", borderStyle: "dashed", alignItems: "center", justifyContent: "center" },
+  devBtnText: { fontSize: 12, fontWeight: "600", color: INK3 },
 });

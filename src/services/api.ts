@@ -1,200 +1,165 @@
+import { apiClient } from "../api/client";
 import { Post, Comment } from "../store/postStore";
 
-// Mock API delay to simulate network requests
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+export interface BoardCategory {
+  id: string;
+  label: string;
+}
 
-// Mock posts data
-let mockPosts: Post[] = [
-  {
-    id: "1",
-    title: "첫 번째 목도리 완성!",
-    description:
-      "겨울용 목도리를 드디어 완성했어요. 패턴은 기본 메리야스뜨기입니다.",
-    imageUri:
-      "https://images.unsplash.com/photo-1601924381111-5e0fd1d6df5d?w=800",
-    author: "뜨개왕초보",
-    likes: 15,
-    commentCount: 3,
-    createdAt: new Date("2024-01-01"),
-  },
-  {
-    id: "2",
-    title: "아기 모자 만들기",
-    description: "조카 선물용으로 만든 아기 모자예요. 너무 귀엽지 않나요?",
-    imageUri:
-      "https://images.unsplash.com/photo-1515488764276-beab7607c1e6?w=800",
-    author: "엄마손",
-    likes: 32,
-    commentCount: 5,
-    createdAt: new Date("2024-01-02"),
-  },
-];
+export interface Content {
+  id: string;
+  title: string;
+  youtubeId: string | null;
+  videoUrl: string | null;
+  order: number;
+  channel: { id: string; name: string } | null;
+  createdAt: string;
+}
 
-// Mock comments data
-let mockComments: Comment[] = [
-  {
-    id: "1",
-    postId: "1",
-    author: "뜨개마스터",
-    content: "정말 멋지네요! 패턴 어디서 구하셨어요?",
-    createdAt: new Date("2024-01-01T10:00:00"),
-  },
-  {
-    id: "2",
-    postId: "1",
-    author: "털실사랑",
-    content: "색상 조합이 너무 예뻐요!",
-    createdAt: new Date("2024-01-01T11:30:00"),
-  },
-  {
-    id: "3",
-    postId: "1",
-    author: "엄마손",
-    content: "저도 하나 만들어보고 싶어요",
-    createdAt: new Date("2024-01-01T14:20:00"),
-  },
-  {
-    id: "4",
-    postId: "2",
-    author: "뜨개왕초보",
-    content: "너무 귀여워요! 조카가 좋아하겠어요",
-    createdAt: new Date("2024-01-02T09:15:00"),
-  },
-  {
-    id: "5",
-    postId: "2",
-    author: "뜨개마스터",
-    content: "아기 모자 만들기 정말 재미있죠!",
-    createdAt: new Date("2024-01-02T10:45:00"),
-  },
-  {
-    id: "6",
-    postId: "2",
-    author: "털실사랑",
-    content: "실 굵기는 어떤 걸 쓰셨나요?",
-    createdAt: new Date("2024-01-02T12:00:00"),
-  },
-  {
-    id: "7",
-    postId: "2",
-    author: "초보뜨개러",
-    content: "저도 만들어보고 싶은데 초보자도 가능할까요?",
-    createdAt: new Date("2024-01-02T15:30:00"),
-  },
-  {
-    id: "8",
-    postId: "2",
-    author: "엄마손",
-    content: "초보자도 충분히 가능해요! 유튜브 영상 보면서 따라하면 됩니다 😊",
-    createdAt: new Date("2024-01-02T16:00:00"),
-  },
-];
+export interface Challenge {
+  id: string;
+  title: string | null;
+  body: string | null;
+  author: { id: string; nickname: string | null };
+  content: { id: string; title: string } | null;
+  createdAt: string;
+}
+
+export interface XpWallet {
+  totalXp: number;
+  level: number;
+  currentLevelXp: number;
+  nextLevelXp: number;
+}
+
+export interface PointsWallet {
+  balance: number;
+}
+
+export interface WatchHistory {
+  id: string;
+  contentId: string;
+  watchRate: number;
+  lastWatchedTimestamp: string;
+  createdAt: string;
+}
 
 export const postsApi = {
-  // Fetch all posts
-  getPosts: async (): Promise<Post[]> => {
-    await delay(500);
-    return [...mockPosts].sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+  getPosts: async (categoryId?: string): Promise<Post[]> => {
+    const params = categoryId ? { categoryId } : {};
+    const res = await apiClient.get("/api/boards", { params });
+    return Array.isArray(res.data) ? res.data : (res.data.items ?? []);
   },
 
-  // Fetch posts by author
-  getPostsByAuthor: async (author: string): Promise<Post[]> => {
-    await delay(300);
-    return mockPosts.filter((post) => post.author === author);
+  getPostsByAuthor: async (authorId: string): Promise<Post[]> => {
+    const res = await apiClient.get("/api/boards", { params: { authorId } });
+    return Array.isArray(res.data) ? res.data : (res.data.items ?? []);
   },
 
-  // Fetch post by ID
   getPostById: async (id: string): Promise<Post | null> => {
-    await delay(200);
-    return mockPosts.find((post) => post.id === id) || null;
+    const res = await apiClient.get(`/api/boards/${id}`);
+    return res.data;
   },
 
-  // Add new post
-  addPost: async (
-    post: Omit<Post, "id" | "createdAt" | "likes" | "commentCount">
-  ): Promise<Post> => {
-    await delay(700);
-    const newPost: Post = {
-      ...post,
-      id: Date.now().toString(),
-      createdAt: new Date(),
-      likes: 0,
-      commentCount: 0,
-    };
-    mockPosts = [newPost, ...mockPosts];
-    return newPost;
+  addPost: async (post: { title: string; body: string; categoryId: string }): Promise<Post> => {
+    const res = await apiClient.post("/api/boards", post);
+    return res.data;
   },
 
-  // Like a post
-  likePost: async (id: string): Promise<Post> => {
-    await delay(300);
-    const post = mockPosts.find((p) => p.id === id);
-    if (!post) {
-      throw new Error("Post not found");
-    }
-    post.likes += 1;
-    return post;
+  likePost: async (id: string): Promise<void> => {
+    await apiClient.post(`/api/boards/${id}/like`);
   },
 
-  // Unlike a post
-  unlikePost: async (id: string): Promise<Post> => {
-    await delay(300);
-    const post = mockPosts.find((p) => p.id === id);
-    if (!post) {
-      throw new Error("Post not found");
-    }
-    post.likes = Math.max(0, post.likes - 1);
-    return post;
+  unlikePost: async (id: string): Promise<void> => {
+    await apiClient.delete(`/api/boards/${id}/like`);
   },
 };
 
 export const commentsApi = {
-  // Fetch comments by post ID
   getCommentsByPostId: async (postId: string): Promise<Comment[]> => {
-    await delay(300);
-    return mockComments
-      .filter((comment) => comment.postId === postId)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const res = await apiClient.get(`/api/boards/${postId}/comments`);
+    return Array.isArray(res.data) ? res.data : (res.data.items ?? []);
   },
 
-  // Add new comment
-  addComment: async (
-    comment: Omit<Comment, "id" | "createdAt">
-  ): Promise<Comment> => {
-    await delay(500);
-    const newComment: Comment = {
-      ...comment,
-      id: Date.now().toString(),
-      createdAt: new Date(),
-    };
-    mockComments = [newComment, ...mockComments];
-
-    // Increment post's commentCount
-    const post = mockPosts.find((p) => p.id === comment.postId);
-    if (post) {
-      post.commentCount += 1;
-    }
-
-    return newComment;
+  addComment: async (comment: { postId: string; body: string; parentId?: string }): Promise<Comment> => {
+    const { postId, ...payload } = comment;
+    const res = await apiClient.post(`/api/boards/${postId}/comments`, payload);
+    return res.data;
   },
 
-  // Delete comment
-  deleteComment: async (commentId: string): Promise<void> => {
-    await delay(300);
-    const comment = mockComments.find((c) => c.id === commentId);
-    if (!comment) {
-      throw new Error("Comment not found");
-    }
+  deleteComment: async ({ postId, commentId }: { postId: string; commentId: string }): Promise<void> => {
+    await apiClient.delete(`/api/boards/${postId}/comments/${commentId}`);
+  },
+};
 
-    mockComments = mockComments.filter((c) => c.id !== commentId);
+export const categoriesApi = {
+  getCategories: async (): Promise<BoardCategory[]> => {
+    const res = await apiClient.get("/api/boards/categories");
+    return Array.isArray(res.data) ? res.data : (res.data.items ?? []);
+  },
+};
 
-    // Decrement post's commentCount
-    const post = mockPosts.find((p) => p.id === comment.postId);
-    if (post) {
-      post.commentCount = Math.max(0, post.commentCount - 1);
-    }
+export const contentsApi = {
+  getTutorials: async (): Promise<Content[]> => {
+    const res = await apiClient.get("/api/contents/tutorials");
+    return Array.isArray(res.data) ? res.data : (res.data.items ?? []);
+  },
+};
+
+export const challengesApi = {
+  getChallenges: async (): Promise<Challenge[]> => {
+    const res = await apiClient.get("/api/challenges");
+    return Array.isArray(res.data) ? res.data : (res.data.items ?? []);
+  },
+  getMyChallenges: async (): Promise<Challenge[]> => {
+    const res = await apiClient.get("/api/challenges/my");
+    return Array.isArray(res.data) ? res.data : (res.data.items ?? []);
+  },
+};
+
+export const xpApi = {
+  getWallet: async (): Promise<XpWallet> => {
+    const res = await apiClient.get("/api/xp/wallet");
+    return res.data;
+  },
+};
+
+export const pointsApi = {
+  getWallet: async (): Promise<PointsWallet> => {
+    const res = await apiClient.get("/api/points/wallet");
+    return res.data;
+  },
+};
+
+export const nicknamesApi = {
+  issue: async (): Promise<string> => {
+    const res = await apiClient.post("/api/nicknames/issue");
+    return res.data.nickname;
+  },
+
+  check: async (nickname: string): Promise<boolean> => {
+    const res = await apiClient.get("/api/nicknames/check", { params: { value: nickname } });
+    if (res.data.isTaken !== undefined) return !res.data.isTaken;
+    return res.data.available ?? res.data.isAvailable ?? !res.data.isDuplicate ?? true;
+  },
+
+  register: async (nickname: string): Promise<void> => {
+    await apiClient.post("/api/nicknames/register", { nickname });
+  },
+};
+
+export const watchHistoryApi = {
+  getAll: async (): Promise<WatchHistory[]> => {
+    const res = await apiClient.get("/api/watch-history");
+    return Array.isArray(res.data) ? res.data : (res.data.items ?? []);
+  },
+
+  save: async (payload: {
+    contentId: string;
+    totalDuration: number;
+    lastWatchedTimestamp: string;
+    watchRate: number;
+  }): Promise<void> => {
+    await apiClient.post("/api/watch-history", payload);
   },
 };

@@ -1,29 +1,25 @@
 {
   "expo": {
-    "name": "뜨개질 커뮤니티",
-    "slug": "knitting-community",
+    "name": "Handdu",
+    "slug": "hamddu",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "backgroundColor": "#5A37A2",
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "backgroundColor": "#FF7325",
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourcompany.knittingcommunity",
+      "bundleIdentifier": "com.hamddu.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#5A37A2"
+        "backgroundColor": "#FF7325"
       },
-      "package": "com.yourcompany.knittingcommunity",
-      "permissions": [
-        "android.permission.RECORD_AUDIO"
-      ]
+      "package": "com.hamddu.app",
+      "permissions": ["android.permission.RECORD_AUDIO"]
     },
     "web": {
       "bundler": "metro"

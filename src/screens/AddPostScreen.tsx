@@ -1,158 +1,225 @@
 import React, { useState } from 'react';
-import { StyleSheet, Image, ScrollView, Alert } from 'react-native';
-import { TextInput, Button, Title } from 'react-native-paper';
-import * as ImagePicker from 'expo-image-picker';
-import { useAddPost } from '../hooks/usePosts';
+import {
+  StyleSheet,
+  ScrollView,
+  Alert,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
+import { useAddPost } from '../hooks/usePosts';
+import { categoriesApi } from '../services/api';
+
+const TITLE_MAX = 200;
+const BODY_MAX = 10000;
 
 export default function AddPostScreen() {
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [imageUri, setImageUri] = useState('');
-  const [author, setAuthor] = useState('');
+  const [body, setBody] = useState('');
+  const [categoryId, setCategoryId] = useState('');
 
   const addPostMutation = useAddPost();
   const navigation = useNavigation();
 
-  const pickImage = async () => {
-    // Request permission
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
-    if (permissionResult.granted === false) {
-      Alert.alert('권한 필요', '사진 라이브러리 접근 권한이 필요합니다.');
-      return;
-    }
+  const { data: categories = [], isLoading: categoriesLoading, error: categoriesError } = useQuery({
+    queryKey: ['categories'],
+    queryFn: categoriesApi.getCategories,
+  });
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
+  console.log('[categories]', { categoriesLoading, categoriesError, count: categories.length, data: categories });
 
-    if (!result.canceled) {
-      setImageUri(result.assets[0].uri);
-    }
-  };
+  const isValid = title.trim().length > 0 && body.trim().length > 0 && !!categoryId;
 
   const handleSubmit = async () => {
-    if (!title || !description || !imageUri || !author) {
-      Alert.alert('입력 오류', '모든 항목을 입력해주세요.');
+    if (!isValid) {
+      Alert.alert('입력 오류', '카테고리, 제목, 내용을 모두 입력해주세요.');
       return;
     }
-
     try {
       await addPostMutation.mutateAsync({
-        title,
-        description,
-        imageUri,
-        author,
+        title: title.trim(),
+        body: body.trim(),
+        categoryId,
       });
-
-      Alert.alert('성공', '작품이 등록되었습니다!');
-
-      // Reset form
-      setTitle('');
-      setDescription('');
-      setImageUri('');
-      setAuthor('');
-
-      // Navigate back to home
-      navigation.navigate('Home' as never);
-    } catch (error) {
-      Alert.alert('오류', '작품 등록에 실패했습니다.');
+      navigation.goBack();
+    } catch {
+      Alert.alert('오류', '게시글 등록에 실패했습니다. 다시 시도해주세요.');
     }
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <Title style={styles.title}>새 작품 등록</Title>
-      
-      <Button
-        mode="outlined"
-        onPress={pickImage}
-        style={styles.imageButton}
-        icon="camera"
+    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={90}
       >
-        {imageUri ? '사진 변경' : '사진 선택'}
-      </Button>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* 카테고리 */}
+          <Text style={styles.label}>카테고리 <Text style={styles.required}>*</Text></Text>
+          {categoriesLoading ? (
+            <ActivityIndicator color={PRIMARY} style={{ marginBottom: 16 }} />
+          ) : categoriesError ? (
+            <Text style={styles.catError}>카테고리 로드 실패: {String(categoriesError)}</Text>
+          ) : categories.length === 0 ? (
+            <Text style={styles.catError}>등록된 카테고리가 없어요 (서버에 카테고리를 추가해주세요)</Text>
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.catScroll}
+              contentContainerStyle={styles.catRow}
+            >
+              {categories.map((cat) => (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[styles.catChip, categoryId === cat.id && styles.catChipActive]}
+                  onPress={() => setCategoryId(cat.id)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.catChipText, categoryId === cat.id && styles.catChipTextActive]}>
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
 
-      {imageUri && (
-        <Image source={{ uri: imageUri }} style={styles.imagePreview} />
-      )}
+          {/* 제목 */}
+          <View style={styles.fieldHeader}>
+            <Text style={styles.label}>제목 <Text style={styles.required}>*</Text></Text>
+            <Text style={[styles.count, title.length > TITLE_MAX * 0.9 && styles.countWarn]}>
+              {title.length} / {TITLE_MAX}
+            </Text>
+          </View>
+          <TextInput
+            style={styles.titleInput}
+            value={title}
+            onChangeText={(t) => setTitle(t.slice(0, TITLE_MAX))}
+            placeholder="제목을 입력하세요"
+            placeholderTextColor={INK3}
+            returnKeyType="next"
+          />
 
-      <TextInput
-        label="작품 제목"
-        value={title}
-        onChangeText={setTitle}
-        mode="outlined"
-        style={styles.input}
-      />
+          {/* 내용 */}
+          <View style={styles.fieldHeader}>
+            <Text style={styles.label}>내용 <Text style={styles.required}>*</Text></Text>
+            <Text style={[styles.count, body.length > BODY_MAX * 0.9 && styles.countWarn]}>
+              {body.length} / {BODY_MAX}
+            </Text>
+          </View>
+          <TextInput
+            style={styles.bodyInput}
+            value={body}
+            onChangeText={(t) => setBody(t.slice(0, BODY_MAX))}
+            placeholder="내용을 입력하세요"
+            placeholderTextColor={INK3}
+            multiline
+            textAlignVertical="top"
+          />
+        </ScrollView>
 
-      <TextInput
-        label="작성자"
-        value={author}
-        onChangeText={setAuthor}
-        mode="outlined"
-        style={styles.input}
-      />
-
-      <TextInput
-        label="작품 설명"
-        value={description}
-        onChangeText={setDescription}
-        mode="outlined"
-        multiline
-        numberOfLines={4}
-        style={styles.input}
-      />
-
-      <Button
-        mode="contained"
-        onPress={handleSubmit}
-        style={styles.submitButton}
-        loading={addPostMutation.isPending}
-        disabled={addPostMutation.isPending}
-      >
-        {addPostMutation.isPending ? '등록 중...' : '등록하기'}
-      </Button>
-    </ScrollView>
+        {/* 등록 버튼 */}
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[styles.submitBtn, (!isValid || addPostMutation.isPending) && styles.submitBtnDisabled]}
+            onPress={handleSubmit}
+            disabled={!isValid || addPostMutation.isPending}
+            activeOpacity={0.85}
+          >
+            {addPostMutation.isPending ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.submitBtnText}>등록하기</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
+const PRIMARY = '#FF7325';
+const PRIMARY_DEEP = '#C7521A';
+const INK1 = '#1A1A1A';
+const INK3 = '#8A8A8A';
+const LINE = '#ECECEC';
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: '#F5F5F5',
+  safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
+  flex: { flex: 1 },
+  scroll: { flex: 1 },
+  content: { padding: 20, paddingBottom: 8 },
+  label: { fontSize: 13, fontWeight: '700', color: INK1, marginBottom: 8 },
+  required: { color: PRIMARY },
+  fieldHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 },
+  count: { fontSize: 11, color: INK3, fontWeight: '600' },
+  countWarn: { color: '#E55B4B' },
+  catError: { fontSize: 12, color: '#E55B4B', marginBottom: 16, fontWeight: '600' },
+  catScroll: { marginBottom: 20, flexShrink: 0 },
+  catRow: { gap: 8, paddingRight: 4 },
+  catChip: {
+    height: 34,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: '#F2F2F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: LINE,
   },
-  title: {
-    marginBottom: 24,
-    color: '#5A37A2',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  imageButton: {
-    marginBottom: 20,
-    borderColor: '#5A37A2',
+  catChipActive: { backgroundColor: INK1, borderColor: INK1 },
+  catChipText: { fontSize: 13, fontWeight: '600', color: INK1 },
+  catChipTextActive: { color: '#fff', fontWeight: '800' },
+  titleInput: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
     borderWidth: 1.5,
-    borderRadius: 12,
-  },
-  imagePreview: {
-    width: '100%',
-    height: 250,
-    borderRadius: 16,
+    borderColor: LINE,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 15,
+    fontWeight: '700',
+    color: INK1,
     marginBottom: 20,
   },
-  input: {
+  bodyInput: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: LINE,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: INK1,
+    minHeight: 200,
+    lineHeight: 22,
     marginBottom: 16,
-    backgroundColor: '#FFFFFF',
   },
-  submitButton: {
-    marginTop: 12,
-    marginBottom: 30,
-    backgroundColor: '#5A37A2',
-    borderRadius: 12,
-    paddingVertical: 6,
+  footer: { padding: 16, paddingBottom: Platform.OS === 'ios' ? 8 : 16 },
+  submitBtn: {
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: PRIMARY_DEEP,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 4,
   },
+  submitBtnDisabled: { backgroundColor: '#D0D0D0', shadowColor: 'transparent', elevation: 0 },
+  submitBtnText: { fontSize: 16, fontWeight: '800', color: '#fff' },
 });

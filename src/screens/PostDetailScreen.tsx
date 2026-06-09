@@ -8,7 +8,6 @@ import {
   FlatList,
   ActivityIndicator,
   TouchableOpacity,
-  Image,
 } from "react-native";
 import {
   Card,
@@ -21,13 +20,15 @@ import {
 import { useRoute, useNavigation } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useQuery } from "@tanstack/react-query";
 import { usePost, useLikePost } from "../hooks/usePosts";
 import { useComments, useAddComment } from "../hooks/useComments";
-import { HomeStackParamList } from "../types/navigation";
+import { CommunityStackParamList } from "../types/navigation";
 import CommentItem from "../components/CommentItem";
+import { getMyProfile } from "../api/users.api";
 
-type PostDetailRouteProp = RouteProp<HomeStackParamList, "PostDetail">;
-type NavigationProp = NativeStackNavigationProp<HomeStackParamList>;
+type PostDetailRouteProp = RouteProp<CommunityStackParamList, "PostDetail">;
+type NavigationProp = NativeStackNavigationProp<CommunityStackParamList>;
 
 export default function PostDetailScreen() {
   const route = useRoute<PostDetailRouteProp>();
@@ -36,6 +37,7 @@ export default function PostDetailScreen() {
 
   const { data: post, isLoading: postLoading } = usePost(postId);
   const { data: comments, isLoading: commentsLoading } = useComments(postId);
+  const { data: myProfile } = useQuery({ queryKey: ["profile", "me"], queryFn: getMyProfile });
   const likeMutation = useLikePost();
   const addCommentMutation = useAddComment();
 
@@ -53,8 +55,7 @@ export default function PostDetailScreen() {
     addCommentMutation.mutate(
       {
         postId,
-        author: "뜨개왕초보",
-        content: commentText,
+        body: commentText,
       },
       {
         onSuccess: () => {
@@ -66,7 +67,7 @@ export default function PostDetailScreen() {
 
   const handleAuthorPress = () => {
     if (post) {
-      navigation.navigate("UserProfile", { authorName: post.author });
+      navigation.navigate("UserProfile", { authorName: post.author?.nickname ?? '익명' });
     }
   };
 
@@ -93,9 +94,6 @@ export default function PostDetailScreen() {
       keyboardVerticalOffset={90}
     >
       <ScrollView style={styles.scrollView}>
-        {/* 게시물 이미지 */}
-        <Image source={{ uri: post.imageUri }} style={styles.image} />
-
         {/* 게시물 정보 */}
         <Card style={styles.postCard}>
           {/* 작성자 정보 */}
@@ -107,26 +105,26 @@ export default function PostDetailScreen() {
                 style={styles.avatar}
                 color="#FFFFFF"
               />
-              <Text style={styles.authorName}>{post.author}</Text>
+              <Text style={styles.authorName}>{post.author?.nickname ?? '익명'}</Text>
             </Card.Content>
           </TouchableOpacity>
 
-          {/* 제목과 설명 */}
+          {/* 제목과 내용 */}
           <Card.Content>
             <Text style={styles.title}>{post.title}</Text>
-            <Text style={styles.description}>{post.description}</Text>
+            <Text style={styles.description}>{post.body}</Text>
           </Card.Content>
 
           {/* 좋아요 버튼 */}
           <Card.Content style={styles.actionSection}>
             <View style={styles.actionRow}>
               <IconButton
-                icon="heart"
+                icon={post.likedByMe ? "heart" : "heart-outline"}
                 size={28}
                 iconColor="#5A37A2"
                 onPress={handleLikePress}
               />
-              <Text style={styles.likes}>{post.likes}명이 좋아합니다</Text>
+              <Text style={styles.likes}>{post.likeCount}명이 좋아합니다</Text>
             </View>
           </Card.Content>
         </Card>
@@ -143,7 +141,7 @@ export default function PostDetailScreen() {
             <FlatList
               data={comments}
               renderItem={({ item }) => (
-                <CommentItem comment={item} currentUser="뜨개왕초보" />
+                <CommentItem comment={item} currentUser={myProfile?.nickname ?? ""} />
               )}
               keyExtractor={(item) => item.id}
               scrollEnabled={false}
