@@ -5,9 +5,12 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useMutation } from "@tanstack/react-query";
 import { useAuthStore } from "../store/authStore";
+import { submitSurvey } from "../api/users.api";
 
 const AGE_OPTIONS = ["14-18", "19-24", "25-29", "30-34", "35-39", "40-49", "50+"];
 const GENDER_OPTIONS = [{ label: "여성", value: "F" }, { label: "남성", value: "M" }];
@@ -27,6 +30,12 @@ export default function SurveyQuestionsScreen() {
   const [ability, setAbility] = useState("");
 
   const canSubmit = age && gender && interest && ability;
+
+  const submitMutation = useMutation({
+    mutationFn: () => submitSurvey({ age, gender, interests: interest, ability }),
+    onSuccess: () => setSurveyRequired(false),
+    onError: () => setSurveyRequired(false),
+  });
 
   return (
     <SafeAreaView style={styles.flex}>
@@ -115,12 +124,16 @@ export default function SurveyQuestionsScreen() {
       {/* CTA */}
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.startBtn, !canSubmit && styles.startBtnDisabled]}
-          onPress={() => setSurveyRequired(false)}
-          disabled={!canSubmit}
+          style={[styles.startBtn, (!canSubmit || submitMutation.isPending) && styles.startBtnDisabled]}
+          onPress={() => submitMutation.mutate()}
+          disabled={!canSubmit || submitMutation.isPending}
           activeOpacity={0.85}
         >
-          <Text style={styles.startBtnText}>함뜨 시작하기 🐹</Text>
+          {submitMutation.isPending ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.startBtnText}>함뜨 시작하기 🐹</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

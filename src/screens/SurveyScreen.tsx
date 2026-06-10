@@ -13,6 +13,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { nicknamesApi } from "../services/api";
+import { updateNickname } from "../api/users.api";
 import { SurveyStackParamList } from "../types/navigation";
 
 type NavigationProp = NativeStackNavigationProp<SurveyStackParamList>;
@@ -54,12 +55,14 @@ export default function SurveyScreen() {
   });
 
   const registerMutation = useMutation({
-    mutationFn: (nickname: string) => nicknamesApi.register(nickname),
+    mutationFn: async (nickname: string) => {
+      await updateNickname(nickname);
+      await nicknamesApi.register(nickname).catch(() => {});
+    },
     onSuccess: () => {
       navigation.navigate("SurveyQuestions");
     },
     onError: () => {
-      // 등록 실패해도 다음 단계로 진행 (이미 issue로 저장됐을 수 있음)
       navigation.navigate("SurveyQuestions");
     },
   });
