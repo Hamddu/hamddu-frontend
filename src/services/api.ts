@@ -134,7 +134,9 @@ export const pointsApi = {
 export const nicknamesApi = {
   issue: async (): Promise<string> => {
     const res = await apiClient.post("/api/nicknames/issue");
-    return res.data.nickname;
+    const nickname = res.data?.nickname ?? (typeof res.data === "string" ? res.data : null);
+    if (!nickname) throw new Error("닉네임 발급 실패");
+    return nickname;
   },
 
   check: async (nickname: string): Promise<boolean> => {

@@ -113,7 +113,7 @@ export default function SurveyScreen() {
     registerMutation.mutate(nick.trim());
   };
 
-  const canSubmit = (nickStatus === "ok" || nickStatus === "error") && nick.trim().length >= 2;
+  const canSubmit = (nickStatus === "ok" || nickStatus === "error") && (nick ?? "").trim().length >= 2;
   const isSubmitting = registerMutation.isPending;
 
   return (
