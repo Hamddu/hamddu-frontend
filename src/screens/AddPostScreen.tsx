@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   StyleSheet,
   ScrollView,
@@ -16,15 +16,20 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import { useAddPost } from '../hooks/usePosts';
 import { categoriesApi } from '../services/api';
+import { RichEditor, RichToolbar, actions } from 'react-native-pell-rich-editor';
 
 const TITLE_MAX = 200;
-const BODY_MAX = 10000;
+
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+}
 
 export default function AddPostScreen() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [categoryId, setCategoryId] = useState('');
 
+  const richEditorRef = useRef<RichEditor>(null);
   const addPostMutation = useAddPost();
   const navigation = useNavigation();
 
@@ -33,9 +38,8 @@ export default function AddPostScreen() {
     queryFn: categoriesApi.getCategories,
   });
 
-  console.log('[categories]', { categoriesLoading, categoriesError, count: categories.length, data: categories });
-
-  const isValid = title.trim().length > 0 && body.trim().length > 0 && !!categoryId;
+  const bodyText = stripHtml(body);
+  const isValid = title.trim().length > 0 && bodyText.length > 0 && !!categoryId;
 
   const handleSubmit = async () => {
     if (!isValid) {
@@ -45,7 +49,7 @@ export default function AddPostScreen() {
     try {
       await addPostMutation.mutateAsync({
         title: title.trim(),
-        body: body.trim(),
+        body,
         categoryId,
       });
       navigation.goBack();
@@ -65,6 +69,7 @@ export default function AddPostScreen() {
           style={styles.scroll}
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
         >
           {/* 카테고리 */}
           <Text style={styles.label}>카테고리 <Text style={styles.required}>*</Text></Text>
@@ -113,21 +118,45 @@ export default function AddPostScreen() {
           />
 
           {/* 내용 */}
-          <View style={styles.fieldHeader}>
-            <Text style={styles.label}>내용 <Text style={styles.required}>*</Text></Text>
-            <Text style={[styles.count, body.length > BODY_MAX * 0.9 && styles.countWarn]}>
-              {body.length} / {BODY_MAX}
-            </Text>
-          </View>
-          <TextInput
-            style={styles.bodyInput}
-            value={body}
-            onChangeText={(t) => setBody(t.slice(0, BODY_MAX))}
-            placeholder="내용을 입력하세요"
-            placeholderTextColor={INK3}
-            multiline
-            textAlignVertical="top"
+          <Text style={[styles.label, { marginBottom: 0 }]}>내용 <Text style={styles.required}>*</Text></Text>
+
+          {/* 툴바 */}
+          <RichToolbar
+            editor={richEditorRef}
+            style={styles.toolbar}
+            selectedIconTint={PRIMARY}
+            iconTint={INK2}
+            actions={[
+              actions.setBold,
+              actions.setItalic,
+              actions.setUnderline,
+              actions.setStrikethrough,
+              actions.insertOrderedList,
+              actions.insertBulletsList,
+              actions.indent,
+              actions.outdent,
+              actions.undo,
+              actions.redo,
+            ]}
           />
+
+          {/* 에디터 */}
+          <View style={styles.editorWrap}>
+            <RichEditor
+              ref={richEditorRef}
+              style={styles.editor}
+              initialHeight={220}
+              placeholder="내용을 입력하세요"
+              onChange={setBody}
+              editorStyle={{
+                backgroundColor: '#fff',
+                color: INK1,
+                placeholderColor: INK3,
+                contentCSSText: 'font-family: -apple-system, sans-serif; font-size: 14px; line-height: 1.6; padding: 4px 0;',
+              }}
+              useContainer={false}
+            />
+          </View>
         </ScrollView>
 
         {/* 등록 버튼 */}
@@ -153,6 +182,7 @@ export default function AddPostScreen() {
 const PRIMARY = '#FF7325';
 const PRIMARY_DEEP = '#C7521A';
 const INK1 = '#1A1A1A';
+const INK2 = '#404040';
 const INK3 = '#8A8A8A';
 const LINE = '#ECECEC';
 
@@ -194,18 +224,31 @@ const styles = StyleSheet.create({
     color: INK1,
     marginBottom: 20,
   },
-  bodyInput: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
+  toolbar: {
+    backgroundColor: '#F8F8F8',
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
     borderWidth: 1.5,
+    borderBottomWidth: 1,
     borderColor: LINE,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: INK1,
-    minHeight: 200,
-    lineHeight: 22,
+    marginTop: 10,
+    height: 44,
+  },
+  editorWrap: {
+    borderLeftWidth: 1.5,
+    borderRightWidth: 1.5,
+    borderBottomWidth: 1.5,
+    borderColor: LINE,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
+    overflow: 'hidden',
     marginBottom: 16,
+    minHeight: 220,
+    backgroundColor: '#fff',
+  },
+  editor: {
+    flex: 1,
+    paddingHorizontal: 4,
   },
   footer: { padding: 16, paddingBottom: Platform.OS === 'ios' ? 8 : 16 },
   submitBtn: {

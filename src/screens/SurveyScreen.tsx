@@ -9,11 +9,12 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { nicknamesApi } from "../services/api";
-import { updateNickname } from "../api/users.api";
+import { updateNickname, getMyProfile } from "../api/users.api";
+import { useAuthStore } from "../store/authStore";
 import { SurveyStackParamList } from "../types/navigation";
 
 type NavigationProp = NativeStackNavigationProp<SurveyStackParamList>;
@@ -22,9 +23,9 @@ type NickStatus = "ok" | "duplicate" | "editing" | "loading" | "error";
 const MAX_RANDOM = 12;
 
 const FALLBACK_NICKNAMES = [
-  "포근한 실뭉치", "따뜻한 바늘", "코코아 뜨개", "솜사탕 코바늘", "햇살 대바늘",
-  "폭신한 털실", "모카 뜨개인", "귤빛 바늘땀", "달콤한 실타래", "뭉게구름 코",
-  "라벤더 뜨개", "민트 실뭉치", "복숭아 바늘", "하늘빛 코바늘", "눈송이 뜨개",
+  "포근한실뭉치", "따뜻한바늘", "코코아뜨개", "솜사탕코바늘", "햇살대바늘",
+  "폭신한털실", "모카뜨개인", "귤빛바늘땀", "달콤한실타래", "뭉게구름코",
+  "라벤더뜨개", "민트실뭉치", "복숭아바늘", "하늘빛코바늘", "눈송이뜨개",
 ];
 
 function CheckIcon() { return <Text style={{ fontSize: 13, color: "#4FB17A" }}>✓</Text>; }
@@ -33,11 +34,23 @@ function InfoIcon() { return <Text style={{ fontSize: 13, color: "#8A8A8A" }}>i<
 
 export default function SurveyScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const queryClient = useQueryClient();
+  const setSurveyRequired = useAuthStore((s) => s.setSurveyRequired);
   const [nick, setNick] = useState("");
   const [nickStatus, setNickStatus] = useState<NickStatus>("editing");
   const [isIssued, setIsIssued] = useState(false);
   const [randomCount, setRandomCount] = useState(0);
   const autoIssued = useRef(false);
+
+  // 이미 가입 완료된 유저면 설문 화면 건너뜀
+  useEffect(() => {
+    getMyProfile().then((profile) => {
+      if (profile.surveyCompleted && profile.nickname) {
+        queryClient.setQueryData(["profile", "me"], profile);
+        setSurveyRequired(false);
+      }
+    }).catch(() => {});
+  }, []);
 
   const issueMutation = useMutation({
     mutationFn: nicknamesApi.issue,
@@ -56,10 +69,12 @@ export default function SurveyScreen() {
 
   const registerMutation = useMutation({
     mutationFn: async (nickname: string) => {
-      await updateNickname(nickname);
+      const profile = await updateNickname(nickname);
       await nicknamesApi.register(nickname).catch(() => {});
+      return profile;
     },
-    onSuccess: () => {
+    onSuccess: (profile) => {
+      queryClient.setQueryData(["profile", "me"], profile);
       navigation.navigate("SurveyQuestions");
     },
     onError: () => {
@@ -113,7 +128,7 @@ export default function SurveyScreen() {
 
   const handleSubmit = () => {
     if (!canSubmit) return;
-    registerMutation.mutate(nick.trim());
+    registerMutation.mutate(nick.trim().replace(/\s+/g, "_"));
   };
 
   const canSubmit = (nickStatus === "ok" || nickStatus === "error") && (nick ?? "").trim().length >= 2;

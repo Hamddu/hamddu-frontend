@@ -189,7 +189,7 @@ export default function CommunityScreen() {
                 <Text style={styles.certImgText}>인증 사진</Text>
               </View>
               <View style={styles.certInfo}>
-                <Text style={styles.certTut}>{item.content?.title ?? '튜토리얼'}</Text>
+                <Text style={styles.certTut}>{item.content?.name ?? '튜토리얼'}</Text>
                 <Text style={styles.certName}>{item.author?.nickname ?? '익명'}</Text>
                 <Text style={styles.certTime}>{getTimeAgo(item.createdAt)}</Text>
               </View>

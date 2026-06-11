@@ -47,20 +47,27 @@ export default function ProfileScreen() {
   if (profileLoading) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <ActivityIndicator size="large" color="#FF7325" style={{ marginTop: 40 }} />
+        <ActivityIndicator
+          size="large"
+          color="#FF7325"
+          style={{ marginTop: 40 }}
+        />
       </SafeAreaView>
     );
   }
 
-  const level = xpWallet?.level ?? 1;
-  const currentXp = xpWallet?.currentLevelXp ?? 0;
-  const nextXp = xpWallet?.nextLevelXp ?? 100;
+  const level = xpWallet?.currentLevel ?? 1;
+  const currentXp = xpWallet?.totalXp ?? 0;
+  const nextXp = xpWallet?.nextLevelThreshold ?? 100;
   const xpPct = nextXp > 0 ? Math.min((currentXp / nextXp) * 100, 100) : 0;
   const points = pointsWallet?.balance ?? 0;
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+      >
         <View style={styles.header}>
           <Text style={styles.screenTitle}>마이</Text>
           <TouchableOpacity style={styles.settingsBtn}>
@@ -77,11 +84,17 @@ export default function ProfileScreen() {
             </View>
           </View>
           <View style={styles.userInfo}>
-            <Text style={styles.username}>{profile?.nickname ?? '닉네임 없음'}</Text>
+            <Text style={styles.username}>
+              {profile?.nickname ?? "함뜨개인"}
+            </Text>
             <View style={styles.xpRow}>
               <View style={styles.xpLabels}>
-                <Text style={styles.xpLabel}>XP {currentXp} / {nextXp}</Text>
-                <Text style={styles.xpNext}>다음 레벨까지 {nextXp - currentXp}</Text>
+                <Text style={styles.xpLabel}>
+                  XP {currentXp} / {nextXp}
+                </Text>
+                <Text style={styles.xpNext}>
+                  다음 레벨까지 {nextXp - currentXp}
+                </Text>
               </View>
               <View style={styles.xpBar}>
                 <View style={[styles.xpFill, { width: `${xpPct}%` as any }]} />
@@ -110,14 +123,20 @@ export default function ProfileScreen() {
           <View style={styles.certSectionHeader}>
             <View>
               <Text style={styles.certSectionTitle}>나의 인증 게시글</Text>
-              <Text style={styles.certSectionSub}>튜토리얼을 완료할 때마다 자동으로 모여요</Text>
+              <Text style={styles.certSectionSub}>
+                튜토리얼을 완료할 때마다 자동으로 모여요
+              </Text>
             </View>
-            <Text style={styles.certSectionAll}>전체 {myChallenges.length}</Text>
+            <Text style={styles.certSectionAll}>
+              전체 {myChallenges.length}
+            </Text>
           </View>
 
           {myChallenges.length === 0 ? (
             <View style={styles.emptyBox}>
-              <Text style={styles.emptyText}>아직 인증한 튜토리얼이 없어요 🐹</Text>
+              <Text style={styles.emptyText}>
+                아직 인증한 튜토리얼이 없어요 🐹
+              </Text>
             </View>
           ) : (
             <View style={styles.certGrid}>
@@ -128,9 +147,11 @@ export default function ProfileScreen() {
                   </View>
                   <View style={styles.certItemInfo}>
                     <Text style={styles.certItemTut} numberOfLines={1}>
-                      {item.content?.title ?? item.title ?? '인증'}
+                      {item.content?.name ?? item.title ?? "인증"}
                     </Text>
-                    <Text style={styles.certItemDate}>{getTimeAgo(item.createdAt)}</Text>
+                    <Text style={styles.certItemDate}>
+                      {getTimeAgo(item.createdAt)}
+                    </Text>
                   </View>
                 </View>
               ))}
@@ -170,46 +191,169 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#FFFFFF" },
   container: { flex: 1, backgroundColor: "#FFFFFF" },
   content: { paddingBottom: 40 },
-  header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingTop: 8, paddingBottom: 6 },
-  screenTitle: { flex: 1, fontSize: 22, fontWeight: "800", color: INK1, letterSpacing: -0.4 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 6,
+  },
+  screenTitle: {
+    flex: 1,
+    fontSize: 22,
+    fontWeight: "800",
+    color: INK1,
+    letterSpacing: -0.4,
+  },
   settingsBtn: { padding: 8 },
   settingsIcon: { fontSize: 18 },
-  userCard: { flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: "#fff", borderRadius: 20, padding: 18, marginHorizontal: 20, marginBottom: 12, borderWidth: 1, borderColor: LINE },
-  avatarWrap: { width: 76, height: 76, borderRadius: 38, backgroundColor: PRIMARY_SOFT, alignItems: "center", justifyContent: "center", position: "relative" },
+  userCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 18,
+    marginHorizontal: 20,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: LINE,
+  },
+  avatarWrap: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: PRIMARY_SOFT,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
   avatarEmoji: { fontSize: 36 },
-  levelBadge: { position: "absolute", bottom: -2, right: -2, backgroundColor: PRIMARY, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, borderWidth: 2, borderColor: "#fff" },
+  levelBadge: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    backgroundColor: PRIMARY,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
   levelText: { fontSize: 10, fontWeight: "800", color: "#fff" },
   userInfo: { flex: 1, minWidth: 0 },
-  username: { fontSize: 18, fontWeight: "800", color: INK1, letterSpacing: -0.3, marginBottom: 8 },
+  username: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: INK1,
+    letterSpacing: -0.3,
+    marginBottom: 8,
+  },
   xpRow: { gap: 3 },
-  xpLabels: { flexDirection: "row", justifyContent: "space-between", marginBottom: 3 },
+  xpLabels: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 3,
+  },
   xpLabel: { fontSize: 10, color: INK3, fontWeight: "700" },
   xpNext: { fontSize: 10, color: PRIMARY, fontWeight: "700" },
-  xpBar: { height: 6, backgroundColor: LINE, borderRadius: 3, overflow: "hidden" },
+  xpBar: {
+    height: 6,
+    backgroundColor: LINE,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
   xpFill: { height: "100%", backgroundColor: PRIMARY, borderRadius: 3 },
-  statsCard: { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 16, padding: 18, marginHorizontal: 20, marginBottom: 12, borderWidth: 1, borderColor: LINE },
+  statsCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 18,
+    marginHorizontal: 20,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: LINE,
+  },
   statItem: { flex: 1, alignItems: "center" },
-  statValue: { fontSize: 30, fontWeight: "800", color: INK1, letterSpacing: -1 },
+  statValue: {
+    fontSize: 30,
+    fontWeight: "800",
+    color: INK1,
+    letterSpacing: -1,
+  },
   statValueOrange: { color: PRIMARY },
   statStars: { fontSize: 11, color: PRIMARY, fontWeight: "700", marginTop: 2 },
   statLabel: { fontSize: 11, color: INK3, fontWeight: "700", marginTop: 2 },
-  statDivider: { width: 1, alignSelf: "stretch", backgroundColor: LINE, marginVertical: 4 },
+  statDivider: {
+    width: 1,
+    alignSelf: "stretch",
+    backgroundColor: LINE,
+    marginVertical: 4,
+  },
   certSection: { paddingHorizontal: 20, marginBottom: 20 },
-  certSectionHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 },
-  certSectionTitle: { fontSize: 16, fontWeight: "800", color: INK1, letterSpacing: -0.3 },
+  certSectionHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  certSectionTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: INK1,
+    letterSpacing: -0.3,
+  },
   certSectionSub: { fontSize: 11, color: INK3, marginTop: 2 },
   certSectionAll: { fontSize: 11, fontWeight: "700", color: PRIMARY },
   certGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  certGridItem: { width: "30%", flexGrow: 1, backgroundColor: "#fff", borderRadius: 12, overflow: "hidden", borderWidth: 1, borderColor: LINE },
-  certThumb: { height: 96, backgroundColor: "#F2F2F2", alignItems: "center", justifyContent: "center" },
+  certGridItem: {
+    width: "30%",
+    flexGrow: 1,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: LINE,
+  },
+  certThumb: {
+    height: 96,
+    backgroundColor: "#F2F2F2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   certThumbText: { fontSize: 28 },
   certItemInfo: { padding: 8 },
   certItemTut: { fontSize: 11, fontWeight: "800", color: INK1 },
   certItemDate: { fontSize: 10, color: INK3, marginTop: 1 },
-  emptyBox: { backgroundColor: "#fff", borderRadius: 14, padding: 24, alignItems: "center", borderWidth: 1, borderColor: LINE },
+  emptyBox: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 24,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: LINE,
+  },
   emptyText: { fontSize: 13, color: INK3, fontWeight: "600" },
-  logoutBtn: { marginHorizontal: 20, height: 48, borderRadius: 12, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center" },
+  logoutBtn: {
+    marginHorizontal: 20,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: "#F5F5F5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   logoutBtnText: { fontSize: 14, fontWeight: "700", color: INK2 },
-  devBtn: { marginHorizontal: 20, marginTop: 8, height: 40, borderRadius: 12, borderWidth: 1, borderColor: "#E0E0E0", borderStyle: "dashed", alignItems: "center", justifyContent: "center" },
+  devBtn: {
+    marginHorizontal: 20,
+    marginTop: 8,
+    height: 40,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderStyle: "dashed",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   devBtnText: { fontSize: 12, fontWeight: "600", color: INK3 },
 });

@@ -8,10 +8,14 @@ export interface BoardCategory {
 
 export interface Content {
   id: string;
-  title: string;
-  youtubeId: string | null;
-  videoUrl: string | null;
-  order: number;
+  name: string;
+  sourceVideoId: string | null;
+  type: string;
+  status: string;
+  interests: string | null;
+  sortOrder: number | null;
+  imageUrl: string | null;
+  pointApplyable: boolean;
   channel: { id: string; name: string } | null;
   createdAt: string;
 }
@@ -20,16 +24,18 @@ export interface Challenge {
   id: string;
   title: string | null;
   body: string | null;
-  author: { id: string; nickname: string | null };
-  content: { id: string; title: string } | null;
+  imageUrl: string | null;
+  author: { id: string; nickname: string };
+  content: { id: string; name: string } | null;
   createdAt: string;
 }
 
 export interface XpWallet {
   totalXp: number;
-  level: number;
-  currentLevelXp: number;
-  nextLevelXp: number;
+  currentLevel: number;
+  xpToNextLevel: number;
+  nextLevelThreshold: number | null;
+  levelLabel: string | null;
 }
 
 export interface PointsWallet {
@@ -41,19 +47,21 @@ export interface WatchHistory {
   contentId: string;
   watchRate: number;
   lastWatchedTimestamp: string;
+  totalDuration: number;
   createdAt: string;
 }
 
 export const postsApi = {
   getPosts: async (categoryId?: string): Promise<Post[]> => {
-    const params = categoryId ? { categoryId } : {};
+    const params: Record<string, any> = { page: 1, limit: 20, sort: "latest" };
+    if (categoryId) params.categoryId = categoryId;
     const res = await apiClient.get("/api/boards", { params });
-    return Array.isArray(res.data) ? res.data : (res.data.items ?? []);
+    return Array.isArray(res.data) ? res.data : (res.data.data ?? res.data.items ?? []);
   },
 
   getPostsByAuthor: async (authorId: string): Promise<Post[]> => {
     const res = await apiClient.get("/api/boards", { params: { authorId } });
-    return Array.isArray(res.data) ? res.data : (res.data.items ?? []);
+    return Array.isArray(res.data) ? res.data : (res.data.data ?? res.data.items ?? []);
   },
 
   getPostById: async (id: string): Promise<Post | null> => {
@@ -78,7 +86,7 @@ export const postsApi = {
 export const commentsApi = {
   getCommentsByPostId: async (postId: string): Promise<Comment[]> => {
     const res = await apiClient.get(`/api/boards/${postId}/comments`);
-    return Array.isArray(res.data) ? res.data : (res.data.items ?? []);
+    return Array.isArray(res.data) ? res.data : (res.data.data ?? []);
   },
 
   addComment: async (comment: { postId: string; body: string; parentId?: string }): Promise<Comment> => {
@@ -95,25 +103,30 @@ export const commentsApi = {
 export const categoriesApi = {
   getCategories: async (): Promise<BoardCategory[]> => {
     const res = await apiClient.get("/api/boards/categories");
-    return Array.isArray(res.data) ? res.data : (res.data.items ?? []);
+    return Array.isArray(res.data) ? res.data : (res.data.data ?? res.data.items ?? []);
   },
 };
 
 export const contentsApi = {
   getTutorials: async (): Promise<Content[]> => {
-    const res = await apiClient.get("/api/contents/tutorials");
-    return Array.isArray(res.data) ? res.data : (res.data.items ?? []);
+    const [knitting, crochet] = await Promise.all([
+      apiClient.get("/api/contents/tutorials", { params: { interests: "knitting" } }),
+      apiClient.get("/api/contents/tutorials", { params: { interests: "crochet" } }),
+    ]);
+    const knittingData: Content[] = Array.isArray(knitting.data) ? knitting.data : [];
+    const crochetData: Content[] = Array.isArray(crochet.data) ? crochet.data : [];
+return [...knittingData, ...crochetData];
   },
 };
 
 export const challengesApi = {
   getChallenges: async (): Promise<Challenge[]> => {
     const res = await apiClient.get("/api/challenges");
-    return Array.isArray(res.data) ? res.data : (res.data.items ?? []);
+    return Array.isArray(res.data) ? res.data : (res.data.data ?? []);
   },
   getMyChallenges: async (): Promise<Challenge[]> => {
     const res = await apiClient.get("/api/challenges/my");
-    return Array.isArray(res.data) ? res.data : (res.data.items ?? []);
+    return Array.isArray(res.data) ? res.data : (res.data.data ?? []);
   },
 };
 
@@ -153,7 +166,7 @@ export const nicknamesApi = {
 export const watchHistoryApi = {
   getAll: async (): Promise<WatchHistory[]> => {
     const res = await apiClient.get("/api/watch-history");
-    return Array.isArray(res.data) ? res.data : (res.data.items ?? []);
+    return Array.isArray(res.data) ? res.data : (res.data.data ?? []);
   },
 
   save: async (payload: {

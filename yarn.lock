@@ -4065,6 +4065,11 @@ react-native-paper@^5.12.5:
     color "^3.1.2"
     use-latest-callback "^0.2.3"
 
+react-native-pell-rich-editor@^1.10.0:
+  version "1.10.0"
+  resolved "https://registry.yarnpkg.com/react-native-pell-rich-editor/-/react-native-pell-rich-editor-1.10.0.tgz#5463f0af7bf641cd8de652efb45f2bedf8ceabde"
+  integrity sha512-MRL7lokAQOIxcZ900FxHeVA0B3ZRcFlIhZ9FSQIrjHmutN2at+hax139xV0AQ1DwvJ3fYwlUuTr7Pf4hHpy/PA==
+
 react-native-safe-area-context@~5.6.0:
   version "5.6.2"
   resolved "https://registry.npmjs.org/react-native-safe-area-context/-/react-native-safe-area-context-5.6.2.tgz"

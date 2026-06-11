@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { loginWithOAuth } from "../api/auth.api";
+import { getMyProfile } from "../api/users.api";
 import { useAuthStore } from "../store/authStore";
 
 function GoogleIcon() {
@@ -32,7 +33,12 @@ export default function LoginScreen() {
     try {
       const { accessToken, surveyRequired } = await loginWithOAuth(provider);
       setAccessToken(accessToken);
-      setSurveyRequired(surveyRequired);
+      if (surveyRequired) {
+        const profile = await getMyProfile().catch(() => null);
+        setSurveyRequired(!profile?.surveyCompleted && !profile?.nickname);
+      } else {
+        setSurveyRequired(false);
+      }
     } catch (e: any) {
       Alert.alert("로그인 실패", e.message ?? "다시 시도해주세요.");
     } finally {

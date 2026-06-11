@@ -8,6 +8,7 @@ import {
   ScrollView,
   useWindowDimensions,
   StatusBar,
+  Image,
 } from "react-native";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -36,6 +37,8 @@ export default function TutorialVideoScreen() {
   const insets = useSafeAreaInsets();
   const [speed, setSpeed] = useState(1);
   const [watchRate, setWatchRate] = useState(0);
+  const [started, setStarted] = useState(false);
+  const [playing, setPlaying] = useState(false);
   const totalDurationRef = useRef(0);
   const queryClient = useQueryClient();
 
@@ -71,21 +74,42 @@ export default function TutorialVideoScreen() {
       {/* 영상 영역 */}
       <View style={[styles.playerContainer, { paddingTop: insets.top, height: videoHeight + insets.top }]}>
         {YoutubePlayer ? (
-          <YoutubePlayer
-            height={videoHeight}
-            width={width}
-            videoId={videoId}
-            play={false}
-            playbackRate={speed}
-            onChangeState={(state: string) => {
-              if (state === "ended") setWatchRate(100);
-            }}
-            onReady={(e: any) => {
-              e.target?.getDuration?.().then((d: number) => {
-                totalDurationRef.current = d;
-              });
-            }}
-          />
+          <View style={{ width, height: videoHeight }}>
+            <YoutubePlayer
+              height={videoHeight}
+              width={width}
+              videoId={videoId}
+              play={started}
+              playbackRate={speed}
+              onChangeState={(state: string) => {
+                if (state === "playing") setPlaying(true);
+                if (state === "ended") setWatchRate(100);
+              }}
+              onReady={(e: any) => {
+                e.target?.getDuration?.().then((d: number) => {
+                  totalDurationRef.current = d;
+                });
+              }}
+            />
+            {/* 재생 시작 전 썸네일 오버레이 */}
+            {!playing && (
+              <TouchableOpacity
+                style={[styles.thumbContainer, { height: videoHeight, position: "absolute", top: 0, left: 0, right: 0 }]}
+                onPress={() => setStarted(true)}
+                activeOpacity={0.9}
+              >
+                <Image
+                  source={{ uri: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` }}
+                  style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+                  resizeMode="cover"
+                />
+                <View style={styles.thumbDim} />
+                <View style={styles.customPlayBtn}>
+                  <Text style={styles.customPlayIcon}>▶</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          </View>
         ) : (
           <View style={[styles.webPlaceholder, { height: videoHeight }]}>
             <Text style={styles.webPlaceholderText}>모바일에서 확인하세요</Text>
@@ -173,6 +197,34 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
     width: "100%",
     justifyContent: "flex-end",
+  },
+  thumbContainer: {
+    width: "100%",
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  thumbDim: {
+    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.3)",
+  },
+  customPlayBtn: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: PRIMARY,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  customPlayIcon: {
+    fontSize: 24,
+    color: "#fff",
+    marginLeft: 4,
   },
   webPlaceholder: {
     backgroundColor: "#2A2A2A",

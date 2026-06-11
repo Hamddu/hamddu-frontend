@@ -6,13 +6,20 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { HomeStackParamList } from "../types/navigation";
-import { contentsApi, pointsApi, watchHistoryApi, Content, WatchHistory } from "../services/api";
+import {
+  contentsApi,
+  pointsApi,
+  watchHistoryApi,
+  Content,
+  WatchHistory,
+} from "../services/api";
 import { getMyProfile } from "../api/users.api";
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList>;
@@ -30,31 +37,41 @@ interface Lesson {
   channelName: string;
 }
 
-function getLessonState(history: WatchHistory | undefined): { state: LessonState; pct?: number } {
+function getLessonState(history: WatchHistory | undefined): {
+  state: LessonState;
+  pct?: number;
+} {
   if (!history) return { state: "open" };
   if (history.watchRate >= 90) return { state: "done" };
   return { state: "progress", pct: history.watchRate };
 }
 
-function contentToLesson(content: Content, index: number, history?: WatchHistory): Lesson {
+function contentToLesson(
+  content: Content,
+  index: number,
+  history?: WatchHistory,
+): Lesson {
   const { state, pct } = getLessonState(history);
   return {
     id: content.id,
     contentId: content.id,
-    title: content.title,
+    title: content.name,
     sub: `${String(index + 1).padStart(2, "0")}`,
     state,
     pct,
-    videoId: content.youtubeId ?? undefined,
+    videoId: content.sourceVideoId ?? undefined,
     channelName: content.channel?.name ?? "",
   };
 }
 
-function isKnit(channelName: string) {
-  return channelName.includes("대바늘") || channelName.toLowerCase().includes("knit");
-}
 
-function LessonCard({ lesson, onPress }: { lesson: Lesson; onPress: () => void }) {
+function LessonCard({
+  lesson,
+  onPress,
+}: {
+  lesson: Lesson;
+  onPress: () => void;
+}) {
   const done = lesson.state === "done";
   const cur = lesson.state === "progress";
 
@@ -64,15 +81,33 @@ function LessonCard({ lesson, onPress }: { lesson: Lesson; onPress: () => void }
       onPress={onPress}
       activeOpacity={0.75}
     >
-      <View style={[
-        styles.lessonIcon,
-        done && styles.lessonIconDone,
-        cur && styles.lessonIconCur,
-      ]}>
-        {done ? (
-          <Text style={styles.lessonIconCheck}>✓</Text>
-        ) : (
-          <Text style={styles.lessonIconPlay}>▶</Text>
+      <View style={styles.lessonThumb}>
+        {lesson.videoId ? (
+          <Image
+            source={{ uri: `https://img.youtube.com/vi/${lesson.videoId}/mqdefault.jpg` }}
+            style={styles.lessonThumbImg}
+            resizeMode="cover"
+          />
+        ) : null}
+        {/* 플레이 버튼 오버레이 */}
+        {lesson.videoId && !done && (
+          <View style={styles.lessonThumbOverlay}>
+            <View style={[styles.playBtn, cur && styles.playBtnActive]}>
+              <Text style={styles.playBtnIcon}>▶</Text>
+            </View>
+          </View>
+        )}
+        {done && (
+          <View style={styles.lessonThumbOverlay}>
+            <View style={styles.doneBtn}>
+              <Text style={styles.lessonIconCheck}>✓</Text>
+            </View>
+          </View>
+        )}
+        {!lesson.videoId && !done && (
+          <View style={[styles.lessonIcon, cur && styles.lessonIconCur]}>
+            <Text style={styles.lessonIconPlay}>▶</Text>
+          </View>
         )}
       </View>
 
@@ -81,7 +116,9 @@ function LessonCard({ lesson, onPress }: { lesson: Lesson; onPress: () => void }
         <Text style={styles.lessonTitle}>{lesson.title}</Text>
         {cur && lesson.pct != null && (
           <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${lesson.pct}%` as any }]} />
+            <View
+              style={[styles.progressFill, { width: `${lesson.pct}%` as any }]}
+            />
           </View>
         )}
       </View>
@@ -100,8 +137,14 @@ export default function HomeScreen() {
   const navigation = useNavigation<NavigationProp>();
   const [category, setCategory] = useState<Category>("knit");
 
-  const { data: profile } = useQuery({ queryKey: ["profile", "me"], queryFn: getMyProfile });
-  const { data: pointsWallet } = useQuery({ queryKey: ["points", "wallet"], queryFn: pointsApi.getWallet });
+  const { data: profile } = useQuery({
+    queryKey: ["profile", "me"],
+    queryFn: getMyProfile,
+  });
+  const { data: pointsWallet } = useQuery({
+    queryKey: ["points", "wallet"],
+    queryFn: pointsApi.getWallet,
+  });
   const { data: tutorials = [], isLoading: tutorialsLoading } = useQuery({
     queryKey: ["contents", "tutorials"],
     queryFn: contentsApi.getTutorials,
@@ -111,25 +154,25 @@ export default function HomeScreen() {
     queryFn: watchHistoryApi.getAll,
   });
 
-  const historyMap = Object.fromEntries(watchHistory.map((h) => [h.contentId, h]));
+  const historyMap = Object.fromEntries(
+    watchHistory.map((h) => [h.contentId, h]),
+  );
 
   const knitLessons = tutorials
-    .filter((c) => isKnit(c.channel?.name ?? ""))
+    .filter((c) => c.interests === "knitting")
     .map((c, i) => contentToLesson(c, i, historyMap[c.id]));
 
   const crochetLessons = tutorials
-    .filter((c) => !isKnit(c.channel?.name ?? "") && c.channel != null)
+    .filter((c) => c.interests === "crochet")
     .map((c, i) => contentToLesson(c, i, historyMap[c.id]));
 
-  // 채널 구분이 안 될 경우 전체를 knit으로 표시
-  const allLessons = tutorials.map((c, i) => contentToLesson(c, i, historyMap[c.id]));
-  const hasChannelData = tutorials.some((c) => c.channel != null);
-  const lessons = hasChannelData
-    ? (category === "knit" ? knitLessons : crochetLessons)
-    : allLessons;
+  const allLessons = tutorials.map((c, i) =>
+    contentToLesson(c, i, historyMap[c.id]),
+  );
+  const lessons = category === "knit" ? knitLessons : crochetLessons;
 
   const points = pointsWallet?.balance ?? 0;
-  const nickname = profile?.nickname ?? "뜨개인";
+  const nickname = profile?.nickname ?? "함뜨개인";
 
   const ListHeader = () => (
     <View>
@@ -161,24 +204,32 @@ export default function HomeScreen() {
 
       <View style={styles.toggleContainer}>
         <View style={styles.toggle}>
-          <View style={[
-            styles.toggleIndicator,
-            category === "crochet" && styles.toggleIndicatorRight,
-          ]} />
-          {([
-            { k: "knit", label: "🥢  대바늘" },
-            { k: "crochet", label: "🪝  코바늘" },
-          ] as { k: Category; label: string }[]).map((r) => (
+          <View
+            style={[
+              styles.toggleIndicator,
+              category === "crochet" && styles.toggleIndicatorRight,
+            ]}
+          />
+          {(
+            [
+              { k: "knit", label: "🥢  대바늘" },
+              { k: "crochet", label: "🪝  코바늘" },
+            ] as { k: Category; label: string }[]
+          ).map((r) => (
             <TouchableOpacity
               key={r.k}
               style={styles.toggleBtn}
               onPress={() => setCategory(r.k)}
               activeOpacity={0.8}
             >
-              <Text style={[
-                styles.toggleBtnText,
-                category === r.k && styles.toggleBtnTextActive,
-              ]}>{r.label}</Text>
+              <Text
+                style={[
+                  styles.toggleBtnText,
+                  category === r.k && styles.toggleBtnTextActive,
+                ]}
+              >
+                {r.label}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -194,7 +245,11 @@ export default function HomeScreen() {
   if (tutorialsLoading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#FF7325" style={{ marginTop: 60 }} />
+        <ActivityIndicator
+          size="large"
+          color="#FF7325"
+          style={{ marginTop: 60 }}
+        />
       </SafeAreaView>
     );
   }
@@ -244,39 +299,160 @@ const styles = StyleSheet.create({
   listContent: { paddingHorizontal: 20 },
   heroSection: { paddingTop: 8, paddingBottom: 16 },
   sparkle: { fontSize: 22, color: PRIMARY, marginBottom: 8 },
-  heroTitle: { fontSize: 28, fontWeight: "800", color: INK1, letterSpacing: -0.8, lineHeight: 36 },
+  heroTitle: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: INK1,
+    letterSpacing: -0.8,
+    lineHeight: 36,
+  },
   heroTitleAccent: { color: PRIMARY },
   heroSub: { fontSize: 14, color: "#404040", marginTop: 8, lineHeight: 20 },
   heroSubBold: { fontWeight: "800", color: INK1 },
   hudRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
-  hudCard: { flex: 1, backgroundColor: "#fff", borderRadius: 14, padding: 12, borderWidth: 1, borderColor: LINE },
+  hudCard: {
+    flex: 1,
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: LINE,
+  },
   hudCardOrange: { borderColor: PRIMARY_SOFT },
-  hudLabel: { fontSize: 10, fontWeight: "700", color: INK3, letterSpacing: 0.4, marginBottom: 2 },
+  hudLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: INK3,
+    letterSpacing: 0.4,
+    marginBottom: 2,
+  },
   hudValue: { fontSize: 18, fontWeight: "800", color: INK1 },
   hudValueOrange: { color: PRIMARY },
   toggleContainer: { marginBottom: 16 },
-  toggle: { flexDirection: "row", backgroundColor: "rgba(255,255,255,0.85)", borderRadius: 12, borderWidth: 1, borderColor: LINE, padding: 3, position: "relative" },
-  toggleIndicator: { position: "absolute", top: 3, bottom: 3, left: 3, width: "50%", backgroundColor: INK1, borderRadius: 9 },
+  toggle: {
+    flexDirection: "row",
+    backgroundColor: "rgba(255,255,255,0.85)",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: LINE,
+    padding: 3,
+    position: "relative",
+  },
+  toggleIndicator: {
+    position: "absolute",
+    top: 3,
+    bottom: 3,
+    left: 3,
+    width: "50%",
+    backgroundColor: INK1,
+    borderRadius: 9,
+  },
   toggleIndicatorRight: { left: "50%" },
-  toggleBtn: { flex: 1, height: 36, alignItems: "center", justifyContent: "center", zIndex: 1 },
+  toggleBtn: {
+    flex: 1,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1,
+  },
   toggleBtnText: { fontSize: 13, fontWeight: "700", color: INK3 },
   toggleBtnTextActive: { color: "#fff" },
-  sectionHeader: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10 },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
   sectionTitle: { fontSize: 13, fontWeight: "800", color: INK1 },
   sectionCount: { fontSize: 11, color: INK3, fontWeight: "600" },
-  lessonCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "#fff", borderRadius: 16, padding: 12, borderWidth: 1, borderColor: LINE },
+  lessonCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: LINE,
+  },
   lessonCardActive: { borderWidth: 1.5, borderColor: PRIMARY },
-  lessonIcon: { width: 56, height: 56, borderRadius: 12, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center" },
+  lessonThumb: {
+    width: 80,
+    height: 56,
+    borderRadius: 10,
+    overflow: "hidden",
+    backgroundColor: "#F5F5F5",
+  },
+  lessonThumbImg: {
+    width: "100%",
+    height: "100%",
+  },
+  lessonThumbOverlay: {
+    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.25)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  playBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  playBtnActive: {
+    backgroundColor: PRIMARY,
+  },
+  playBtnIcon: { fontSize: 10, color: "#333", marginLeft: 2 },
+  doneBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: PRIMARY,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  lessonIcon: {
+    width: 80,
+    height: 56,
+    borderRadius: 10,
+    backgroundColor: "#F5F5F5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   lessonIconDone: { backgroundColor: PRIMARY },
   lessonIconCur: { backgroundColor: PRIMARY_SOFT },
   lessonIconCheck: { fontSize: 20, color: "#fff", fontWeight: "800" },
   lessonIconPlay: { fontSize: 16, color: PRIMARY, fontWeight: "800" },
   lessonContent: { flex: 1, minWidth: 0 },
-  lessonSub: { fontSize: 10, fontWeight: "700", color: INK3, letterSpacing: 0.3, marginBottom: 2 },
-  lessonTitle: { fontSize: 15, fontWeight: "800", color: INK1, letterSpacing: -0.2 },
-  progressBar: { marginTop: 6, height: 4, backgroundColor: "#F0F0F0", borderRadius: 2, overflow: "hidden" },
+  lessonSub: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: INK3,
+    letterSpacing: 0.3,
+    marginBottom: 2,
+  },
+  lessonTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: INK1,
+    letterSpacing: -0.2,
+  },
+  progressBar: {
+    marginTop: 6,
+    height: 4,
+    backgroundColor: "#F0F0F0",
+    borderRadius: 2,
+    overflow: "hidden",
+  },
   progressFill: { height: "100%", backgroundColor: PRIMARY, borderRadius: 2 },
-  resumeTag: { backgroundColor: INK1, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
+  resumeTag: {
+    backgroundColor: INK1,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
   resumeTagText: { fontSize: 11, fontWeight: "700", color: "#fff" },
   doneText: { fontSize: 11, fontWeight: "700", color: INK3 },
   empty: { alignItems: "center", paddingVertical: 40 },
