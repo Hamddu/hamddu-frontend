@@ -161,7 +161,7 @@ function CounterDetail({
               </View>
               <TouchableOpacity
                 style={styles.nextRowBtn}
-                onPress={handleNextRow}
+                onPress={() => handleNextRow()}
                 activeOpacity={0.8}
               >
                 <Text style={styles.nextRowBtnText}>→ 다음 단으로</Text>

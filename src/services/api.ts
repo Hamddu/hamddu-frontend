@@ -145,17 +145,17 @@ export const pointsApi = {
 };
 
 export const nicknamesApi = {
-  issue: async (): Promise<string> => {
-    const res = await apiClient.post("/api/nicknames/issue");
-    const nickname = res.data?.nickname ?? (typeof res.data === "string" ? res.data : null);
-    if (!nickname) throw new Error("닉네임 발급 실패");
-    return nickname;
+  candidates: async (): Promise<string> => {
+    const res = await apiClient.get("/api/nicknames/candidates");
+    const list: string[] = Array.isArray(res.data) ? res.data : [];
+    const pick = list[Math.floor(Math.random() * list.length)];
+    if (!pick) throw new Error("닉네임 후보 없음");
+    return pick;
   },
 
   check: async (nickname: string): Promise<boolean> => {
     const res = await apiClient.get("/api/nicknames/check", { params: { value: nickname } });
-    if (res.data.isTaken !== undefined) return !res.data.isTaken;
-    return res.data.available ?? res.data.isAvailable ?? !res.data.isDuplicate ?? true;
+    return !res.data.isTaken;
   },
 
   register: async (nickname: string): Promise<void> => {

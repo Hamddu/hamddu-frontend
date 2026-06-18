@@ -20,6 +20,7 @@
     "axios": "^1.15.2",
     "expo": "~55.0.0",
     "expo-dev-client": "~55.0.0",
+    "expo-image-manipulator": "~55.0.17",
     "expo-image-picker": "~55.0.0",
     "expo-linear-gradient": "^56.0.4",
     "expo-linking": "~55.0.0",

@@ -53,7 +53,7 @@ export default function SurveyScreen() {
   }, []);
 
   const issueMutation = useMutation({
-    mutationFn: nicknamesApi.issue,
+    mutationFn: nicknamesApi.candidates,
     onSuccess: (nickname) => {
       setNick(nickname);
       setNickStatus("ok");
@@ -94,7 +94,7 @@ export default function SurveyScreen() {
   const statusConfig = {
     ok:       { color: "#4FB17A", icon: <CheckIcon />, msg: "사용 가능한 닉네임이에요" },
     duplicate:{ color: "#E55B4B", icon: <CrossIcon />, msg: "이미 사용 중인 닉네임이에요" },
-    editing:  { color: "#8A8A8A", icon: <InfoIcon />,  msg: "2~12자, 특수문자 _ 만 사용 가능" },
+    editing:  { color: "#8A8A8A", icon: <InfoIcon />,  msg: "2~30자, 특수문자 _ 만 사용 가능" },
     loading:  { color: "#8A8A8A", icon: <InfoIcon />,  msg: "확인 중..." },
     error:    { color: "#FF7325", icon: <InfoIcon />,  msg: "서버 오류 - 그래도 등록해볼 수 있어요" },
   };
@@ -192,7 +192,7 @@ export default function SurveyScreen() {
               onChangeText={handleNickChange}
               placeholder="닉네임을 입력하세요"
               placeholderTextColor="#AAAAAA"
-              maxLength={12}
+              maxLength={30}
               returnKeyType="done"
             />
             {nickStatus === "loading" ? (

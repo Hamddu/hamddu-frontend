@@ -17,6 +17,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useAddPost } from '../hooks/usePosts';
 import { categoriesApi } from '../services/api';
 import { RichEditor, RichToolbar, actions } from 'react-native-pell-rich-editor';
+import { pickAndUploadImage } from '../services/imageUpload';
 
 const TITLE_MAX = 200;
 
@@ -28,10 +29,24 @@ export default function AddPostScreen() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [uploading, setUploading] = useState(false);
 
   const richEditorRef = useRef<RichEditor>(null);
   const addPostMutation = useAddPost();
   const navigation = useNavigation();
+
+  const handleInsertImage = async () => {
+    setUploading(true);
+    const result = await pickAndUploadImage();
+    setUploading(false);
+    if (!result.ok) {
+      if (result.error !== 'cancelled') {
+        Alert.alert('사진 업로드 실패', result.error);
+      }
+      return;
+    }
+    richEditorRef.current?.insertImage(result.url, 'style="max-width:100%;border-radius:8px;"');
+  };
 
   const { data: categories = [], isLoading: categoriesLoading, error: categoriesError } = useQuery({
     queryKey: ['categories'],
@@ -121,24 +136,37 @@ export default function AddPostScreen() {
           <Text style={[styles.label, { marginBottom: 0 }]}>내용 <Text style={styles.required}>*</Text></Text>
 
           {/* 툴바 */}
-          <RichToolbar
-            editor={richEditorRef}
-            style={styles.toolbar}
-            selectedIconTint={PRIMARY}
-            iconTint={INK2}
-            actions={[
-              actions.setBold,
-              actions.setItalic,
-              actions.setUnderline,
-              actions.setStrikethrough,
-              actions.insertOrderedList,
-              actions.insertBulletsList,
-              actions.indent,
-              actions.outdent,
-              actions.undo,
-              actions.redo,
-            ]}
-          />
+          <View style={styles.toolbarRow}>
+            <RichToolbar
+              editor={richEditorRef}
+              style={styles.toolbar}
+              selectedIconTint={PRIMARY}
+              iconTint={INK2}
+              actions={[
+                actions.setBold,
+                actions.setItalic,
+                actions.setUnderline,
+                actions.setStrikethrough,
+                actions.insertOrderedList,
+                actions.insertBulletsList,
+                actions.indent,
+                actions.outdent,
+                actions.undo,
+                actions.redo,
+              ]}
+            />
+            <TouchableOpacity
+              style={[styles.imgBtn, uploading && styles.imgBtnDisabled]}
+              onPress={handleInsertImage}
+              disabled={uploading}
+              activeOpacity={0.75}
+            >
+              {uploading
+                ? <ActivityIndicator size="small" color={PRIMARY} />
+                : <Text style={styles.imgBtnIcon}>🖼</Text>
+              }
+            </TouchableOpacity>
+          </View>
 
           {/* 에디터 */}
           <View style={styles.editorWrap}>
@@ -224,16 +252,34 @@ const styles = StyleSheet.create({
     color: INK1,
     marginBottom: 20,
   },
+  toolbarRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    marginTop: 10,
+  },
   toolbar: {
+    flex: 1,
     backgroundColor: '#F8F8F8',
     borderTopLeftRadius: 10,
+    borderWidth: 1.5,
+    borderRightWidth: 0,
+    borderBottomWidth: 1,
+    borderColor: LINE,
+    height: 44,
+  },
+  imgBtn: {
+    width: 44,
+    height: 44,
+    backgroundColor: '#F8F8F8',
     borderTopRightRadius: 10,
     borderWidth: 1.5,
     borderBottomWidth: 1,
     borderColor: LINE,
-    marginTop: 10,
-    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  imgBtnDisabled: { opacity: 0.5 },
+  imgBtnIcon: { fontSize: 20 },
   editorWrap: {
     borderLeftWidth: 1.5,
     borderRightWidth: 1.5,
