@@ -35,17 +35,40 @@ export default function AddPostScreen() {
   const addPostMutation = useAddPost();
   const navigation = useNavigation();
 
-  const handleInsertImage = async () => {
-    setUploading(true);
-    const result = await pickAndUploadImage();
-    setUploading(false);
-    if (!result.ok) {
-      if (result.error !== 'cancelled') {
-        Alert.alert('사진 업로드 실패', result.error);
-      }
-      return;
-    }
-    richEditorRef.current?.insertImage(result.url, 'style="max-width:100%;border-radius:8px;"');
+  const handleInsertImage = () => {
+    Alert.alert('사진 추가', '사진을 선택할 방법을 선택하세요.', [
+      {
+        text: '카메라',
+        onPress: async () => {
+          setUploading(true);
+          const result = await pickAndUploadImage('camera');
+          setUploading(false);
+          if (!result.ok) {
+            if (result.error !== 'cancelled') {
+              Alert.alert('사진 업로드 실패', result.error);
+            }
+            return;
+          }
+          richEditorRef.current?.insertImage(result.url, 'style="max-width:100%;border-radius:8px;"');
+        },
+      },
+      {
+        text: '갤러리',
+        onPress: async () => {
+          setUploading(true);
+          const result = await pickAndUploadImage('gallery');
+          setUploading(false);
+          if (!result.ok) {
+            if (result.error !== 'cancelled') {
+              Alert.alert('사진 업로드 실패', result.error);
+            }
+            return;
+          }
+          richEditorRef.current?.insertImage(result.url, 'style="max-width:100%;border-radius:8px;"');
+        },
+      },
+      { text: '취소', style: 'cancel' },
+    ]);
   };
 
   const { data: categories = [], isLoading: categoriesLoading, error: categoriesError } = useQuery({

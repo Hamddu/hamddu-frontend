@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -19,6 +19,8 @@ import SurveyScreen from "./src/screens/SurveyScreen";
 import SurveyQuestionsScreen from "./src/screens/SurveyQuestionsScreen";
 
 import { useAuthStore } from "./src/store/authStore";
+import { useXpLevelDetection } from "./src/hooks/useXpLevelUp";
+import { registerForPushNotifications } from "./src/services/notifications";
 
 const Tab = createBottomTabNavigator();
 const HomeStack = createNativeStackNavigator();
@@ -150,6 +152,20 @@ function MainTabs() {
   );
 }
 
+function AppInitializer({ children }: { children: React.ReactNode }) {
+  const accessToken = useAuthStore((s) => s.accessToken);
+
+  useXpLevelDetection();
+
+  useEffect(() => {
+    if (accessToken) {
+      registerForPushNotifications();
+    }
+  }, [accessToken]);
+
+  return <>{children}</>;
+}
+
 function SurveyStackNavigator() {
   return (
     <SurveyStack.Navigator screenOptions={{ headerShown: false }}>
@@ -186,7 +202,9 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <PaperProvider>
         <NavigationContainer>
-          <RootNavigator />
+          <AppInitializer>
+            <RootNavigator />
+          </AppInitializer>
         </NavigationContainer>
       </PaperProvider>
     </QueryClientProvider>

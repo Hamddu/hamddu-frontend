@@ -49,6 +49,7 @@ export interface WatchHistory {
   lastWatchedTimestamp: string;
   totalDuration: number;
   createdAt: string;
+  lastWatchedAt: string;
 }
 
 export const postsApi = {
@@ -119,6 +120,12 @@ return [...knittingData, ...crochetData];
   },
 };
 
+export interface ChallengeSubmitResult {
+  id: string;
+  pointEarned: number;
+  xpEarned: number;
+}
+
 export const challengesApi = {
   getChallenges: async (): Promise<Challenge[]> => {
     const res = await apiClient.get("/api/challenges");
@@ -127,6 +134,15 @@ export const challengesApi = {
   getMyChallenges: async (): Promise<Challenge[]> => {
     const res = await apiClient.get("/api/challenges/my");
     return Array.isArray(res.data) ? res.data : (res.data.data ?? []);
+  },
+  submit: async (payload: {
+    contentId: string;
+    title?: string;
+    body?: string;
+    mediaId?: string;
+  }): Promise<ChallengeSubmitResult> => {
+    const res = await apiClient.post("/api/challenges", payload);
+    return res.data;
   },
 };
 
@@ -166,7 +182,11 @@ export const nicknamesApi = {
 export const watchHistoryApi = {
   getAll: async (): Promise<WatchHistory[]> => {
     const res = await apiClient.get("/api/watch-history");
-    return Array.isArray(res.data) ? res.data : (res.data.data ?? []);
+    const items: any[] = Array.isArray(res.data) ? res.data : (res.data.data ?? []);
+    return items.map((h) => ({
+      ...h,
+      contentId: h.contentId ?? h.content?.id,
+    }));
   },
 
   save: async (payload: {

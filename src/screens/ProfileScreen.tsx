@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -7,8 +7,16 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  Clipboard,
+  Modal,
 } from "react-native";
+
+let copyToClipboard: ((text: string) => Promise<boolean>) | null = null;
+try {
+  const Clipboard = require("expo-clipboard");
+  if (Clipboard?.setStringAsync) {
+    copyToClipboard = Clipboard.setStringAsync;
+  }
+} catch {}
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "../store/authStore";
@@ -26,6 +34,7 @@ function getTimeAgo(dateStr: string): string {
 
 export default function ProfileScreen() {
   const logout = useAuthStore((s) => s.logout);
+  const [showToken, setShowToken] = useState(false);
 
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["profile", "me"],
@@ -165,17 +174,49 @@ export default function ProfileScreen() {
 
         <TouchableOpacity
           style={styles.devBtn}
-          onPress={() => {
-            const token = useAuthStore.getState().accessToken;
-            if (token) {
-              Clipboard.setString(token);
-              Alert.alert("토큰 복사됨", token);
-            }
-          }}
+          onPress={() => setShowToken(true)}
         >
-          <Text style={styles.devBtnText}>🔑 토큰 복사 (DEV)</Text>
+          <Text style={styles.devBtnText}>🔑 토큰 보기 (DEV)</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <Modal visible={showToken} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowToken(false)} />
+          <View style={styles.tokenModal}>
+            <Text style={styles.tokenModalTitle}>Access Token</Text>
+            <Text style={styles.tokenInput} selectable>
+              {useAuthStore.getState().accessToken ?? ""}
+            </Text>
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
+              <TouchableOpacity
+                style={[styles.tokenCloseBtn, { flex: 1 }]}
+                onPress={async () => {
+                  const token = useAuthStore.getState().accessToken;
+                  if (!token) return;
+                  try {
+                    const Clipboard = require("expo-clipboard");
+                    if (Clipboard?.setStringAsync) {
+                      await Clipboard.setStringAsync(token);
+                      Alert.alert("복사됨", "토큰이 클립보드에 복사되었습니다.");
+                      return;
+                    }
+                  } catch {}
+                  Alert.alert("복사 안내", "토큰 텍스트를 길게 누르면 복사 메뉴가 나타납니다.");
+                }}
+              >
+                <Text style={styles.tokenCloseText}>복사</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tokenCloseBtn, { flex: 1, backgroundColor: "#8A8A8A" }]}
+                onPress={() => setShowToken(false)}
+              >
+                <Text style={styles.tokenCloseText}>닫기</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -356,4 +397,42 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   devBtnText: { fontSize: 12, fontWeight: "600", color: INK3 },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 40,
+  },
+  tokenModal: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 24,
+  },
+  tokenModalTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: INK1,
+    marginBottom: 12,
+  },
+  tokenInput: {
+    backgroundColor: "#F5F5F5",
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 11,
+    color: INK2,
+    maxHeight: 160,
+    textAlignVertical: "top",
+  },
+  tokenCloseBtn: {
+    marginTop: 16,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: PRIMARY,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tokenCloseText: { fontSize: 14, fontWeight: "800", color: "#fff" },
 });

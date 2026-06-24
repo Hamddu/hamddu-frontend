@@ -116,7 +116,7 @@ export default function CommunityScreen() {
       </View>
 
       {tab === "post" ? (
-        <>
+        <View style={styles.postSection}>
           {/* 카테고리 칩 */}
           <ScrollView
             horizontal
@@ -165,7 +165,7 @@ export default function CommunityScreen() {
           >
             <Text style={styles.fabText}>+</Text>
           </TouchableOpacity>
-        </>
+        </View>
       ) : challengesLoading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={PRIMARY} />
@@ -287,6 +287,7 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "800",
   },
+  postSection: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   postList: { flex: 1, backgroundColor: "#FFFFFF" },
   postItem: {

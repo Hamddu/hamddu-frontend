@@ -8,8 +8,10 @@ const MAX_DIMENSION = 1200;
 const COMPRESS_QUALITY = 0.75;
 
 export type PickAndUploadResult =
-  | { ok: true; url: string }
+  | { ok: true; url: string; mediaId: string }
   | { ok: false; error: string };
+
+export type ImageSource = "gallery" | "camera";
 
 async function compressImage(
   uri: string,
@@ -34,37 +36,62 @@ async function compressImage(
   return result.uri;
 }
 
-export async function pickAndUploadImage(): Promise<PickAndUploadResult> {
+export async function pickImage(
+  source: ImageSource = "gallery",
+): Promise<ImagePicker.ImagePickerResult> {
+  if (source === "camera") {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      throw new Error("카메라 접근 권한이 필요해요.");
+    }
+    return ImagePicker.launchCameraAsync({
+      mediaTypes: ["images"],
+      quality: 1,
+      allowsEditing: true,
+      aspect: [4, 3],
+    });
+  }
+
   const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!perm.granted) {
-    return { ok: false, error: "사진 접근 권한이 필요해요." };
+    throw new Error("사진 접근 권한이 필요해요.");
   }
-
-  const result = await ImagePicker.launchImageLibraryAsync({
+  return ImagePicker.launchImageLibraryAsync({
     mediaTypes: ["images"],
     quality: 1,
-    allowsEditing: false,
+    allowsEditing: true,
+    aspect: [4, 3],
   });
+}
 
-  if (result.canceled || !result.assets?.[0]) {
-    return { ok: false, error: "cancelled" };
-  }
-
-  const asset = result.assets[0];
-  const compressedUri = await compressImage(
-    asset.uri,
-    asset.width ?? 0,
-    asset.height ?? 0,
-  );
-
+export async function pickAndUploadImage(
+  source: ImageSource = "gallery",
+): Promise<PickAndUploadResult> {
   try {
-    const token = useAuthStore.getState().accessToken;
+    const result = await pickImage(source);
 
-    const fileRes = await fetch(compressedUri);
-    const blob = await fileRes.blob();
+    if (result.canceled || !result.assets?.[0]) {
+      return { ok: false, error: "cancelled" };
+    }
+
+    const asset = result.assets[0];
+    const compressedUri = await compressImage(
+      asset.uri,
+      asset.width ?? 0,
+      asset.height ?? 0,
+    );
+
+    const token = useAuthStore.getState().accessToken;
+    if (!token) {
+      return { ok: false, error: "로그인이 필요해요." };
+    }
 
     const form = new FormData();
-    form.append("file", blob, `photo_${Date.now()}.jpg`);
+    form.append("file", {
+      uri: compressedUri,
+      name: `photo_${Date.now()}.jpg`,
+      type: "image/jpeg",
+    } as any);
 
     const res = await fetch(`${API_BASE_URL}/api/media/upload`, {
       method: "POST",
@@ -72,14 +99,32 @@ export async function pickAndUploadImage(): Promise<PickAndUploadResult> {
       body: form,
     });
 
+    const rawBody = await res.text();
+    console.log(`[upload] status=${res.status} body=`, rawBody);
+
     if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      return { ok: false, error: (body as any).error ?? "업로드 실패" };
+      let parsed: any = {};
+      try { parsed = JSON.parse(rawBody); } catch {}
+      return { ok: false, error: `HTTP ${res.status}: ${parsed.error ?? parsed.message ?? rawBody}` };
     }
 
-    const { url } = await res.json();
-    return { ok: true, url };
+    const { url, id: mediaId } = JSON.parse(rawBody);
+    return { ok: true, url, mediaId };
   } catch (e: any) {
+    if (e?.message?.includes("권한")) {
+      return { ok: false, error: e.message };
+    }
     return { ok: false, error: e?.message ?? "네트워크 오류" };
+  }
+}
+
+export async function pickAndUploadImageWithSource(
+  onSourceSelect: () => Promise<ImageSource>,
+): Promise<PickAndUploadResult> {
+  try {
+    const source = await onSourceSelect();
+    return pickAndUploadImage(source);
+  } catch {
+    return { ok: false, error: "취소됨" };
   }
 }

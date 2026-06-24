@@ -1,8 +1,11 @@
-import { useEffect } from "react";
-import { Platform, NativeModules } from "react-native";
+import { useEffect, useRef } from "react";
+import { Platform } from "react-native";
 import * as ScreenCapture from "expo-screen-capture";
 
-export function useScreenshotProtection() {
+export function useScreenshotProtection(onCapture?: () => void) {
+  const callbackRef = useRef(onCapture);
+  callbackRef.current = onCapture;
+
   useEffect(() => {
     if (Platform.OS === "android") {
       ScreenCapture.preventScreenCaptureAsync();
@@ -12,9 +15,11 @@ export function useScreenshotProtection() {
     }
 
     if (Platform.OS === "ios") {
-      NativeModules.ScreenshotProtect?.enable();
+      const listener = ScreenCapture.addScreenshotListener(() => {
+        callbackRef.current?.();
+      });
       return () => {
-        NativeModules.ScreenshotProtect?.disable();
+        listener.remove();
       };
     }
   }, []);
