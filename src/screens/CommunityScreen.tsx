@@ -43,28 +43,50 @@ const CATEGORIES = [
   { k: "free", label: "자유" },
 ];
 
-
-function PostListItem({ post, onPress, onLike }: {
+function PostListItem({
+  post,
+  onPress,
+  onLike,
+}: {
   post: Post;
   onPress: () => void;
   onLike: () => void;
 }) {
   return (
-    <TouchableOpacity style={styles.postItem} onPress={onPress} activeOpacity={0.8}>
+    <TouchableOpacity
+      style={styles.postItem}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
       <View style={styles.postHeader}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{(post.author?.nickname ?? '??').slice(0, 2)}</Text>
+          <Text style={styles.avatarText}>
+            {(post.author?.nickname ?? "??").slice(0, 2)}
+          </Text>
         </View>
         <View style={styles.postMeta}>
-          <Text style={styles.postAuthor}>{post.author?.nickname ?? '익명'}</Text>
+          <Text style={styles.postAuthor}>
+            {post.author?.nickname ?? "익명"}
+          </Text>
           <Text style={styles.postTime}>{getTimeAgo(post.createdAt)}</Text>
         </View>
       </View>
-      <Text style={styles.postTitle} numberOfLines={1}>{post.title}</Text>
-      <Text style={styles.postBody} numberOfLines={2}>{post.body}</Text>
+      <Text style={styles.postTitle} numberOfLines={1}>
+        {post.title}
+      </Text>
+      <Text style={styles.postBody} numberOfLines={2}>
+        {post.body}
+      </Text>
       <View style={styles.postFooter}>
         <TouchableOpacity style={styles.postAction} onPress={onLike}>
-          <Text style={[styles.postActionIcon, post.likedByMe && { color: PRIMARY }]}>♥</Text>
+          <Text
+            style={[
+              styles.postActionIcon,
+              post.likedByMe && { color: PRIMARY },
+            ]}
+          >
+            ♥
+          </Text>
           <Text style={styles.postActionText}>{post.likeCount}</Text>
         </TouchableOpacity>
         <View style={styles.postAction}>
@@ -107,7 +129,9 @@ export default function CommunityScreen() {
             onPress={() => setTab(t)}
             activeOpacity={0.7}
           >
-            <Text style={[styles.tabBtnText, tab === t && styles.tabBtnTextActive]}>
+            <Text
+              style={[styles.tabBtnText, tab === t && styles.tabBtnTextActive]}
+            >
               {t === "post" ? "일반 게시글" : "인증 게시글"}
             </Text>
             {tab === t && <View style={styles.tabUnderline} />}
@@ -117,27 +141,6 @@ export default function CommunityScreen() {
 
       {tab === "post" ? (
         <View style={styles.postSection}>
-          {/* 카테고리 칩 */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.catScroll}
-            contentContainerStyle={styles.catContent}
-          >
-            {CATEGORIES.map((c) => (
-              <TouchableOpacity
-                key={c.k}
-                style={[styles.catChip, cat === c.k && styles.catChipActive]}
-                onPress={() => setCat(c.k)}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.catChipText, cat === c.k && styles.catChipTextActive]}>
-                  {c.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
           {isLoading ? (
             <View style={styles.center}>
               <ActivityIndicator size="large" color={PRIMARY} />
@@ -146,14 +149,36 @@ export default function CommunityScreen() {
             <FlatList
               data={posts}
               keyExtractor={(item) => item.id}
+              style={{ flex: 1 }}
+              ListHeaderComponent={
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.catContent}
+                >
+                  {CATEGORIES.map((c) => (
+                    <TouchableOpacity
+                      key={c.k}
+                      style={[styles.catChip, cat === c.k && styles.catChipActive]}
+                      onPress={() => setCat(c.k)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.catChipText, cat === c.k && styles.catChipTextActive]}>
+                        {c.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              }
               renderItem={({ item }) => (
                 <PostListItem
                   post={item}
-                  onPress={() => navigation.navigate("PostDetail", { postId: item.id })}
+                  onPress={() =>
+                    navigation.navigate("PostDetail", { postId: item.id })
+                  }
                   onLike={() => likeMutation.mutate(item.id)}
                 />
               )}
-              style={styles.postList}
             />
           )}
 
@@ -189,9 +214,15 @@ export default function CommunityScreen() {
                 <Text style={styles.certImgText}>인증 사진</Text>
               </View>
               <View style={styles.certInfo}>
-                <Text style={styles.certTut}>{item.content?.name ?? '튜토리얼'}</Text>
-                <Text style={styles.certName}>{item.author?.nickname ?? '익명'}</Text>
-                <Text style={styles.certTime}>{getTimeAgo(item.createdAt)}</Text>
+                <Text style={styles.certTut}>
+                  {item.content?.name ?? "튜토리얼"}
+                </Text>
+                <Text style={styles.certName}>
+                  {item.author?.nickname ?? "익명"}
+                </Text>
+                <Text style={styles.certTime}>
+                  {getTimeAgo(item.createdAt)}
+                </Text>
               </View>
             </View>
           )}
@@ -257,13 +288,10 @@ const styles = StyleSheet.create({
     backgroundColor: PRIMARY,
     borderRadius: 2,
   },
-  catScroll: {
-    backgroundColor: "#fff",
-    flexShrink: 0,
-  },
   catContent: {
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: 0,
     gap: 6,
   },
   catChip: {
@@ -289,7 +317,7 @@ const styles = StyleSheet.create({
   },
   postSection: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  postList: { flex: 1, backgroundColor: "#FFFFFF" },
+
   postItem: {
     backgroundColor: "#fff",
     padding: 16,
@@ -297,7 +325,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: LINE,
   },
-  postHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 },
+  postHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 10,
+  },
   avatar: {
     width: 32,
     height: 32,
@@ -310,7 +343,13 @@ const styles = StyleSheet.create({
   postMeta: {},
   postAuthor: { fontSize: 13, fontWeight: "700", color: INK1 },
   postTime: { fontSize: 11, color: INK3 },
-  postTitle: { fontSize: 15, fontWeight: "800", color: INK1, letterSpacing: -0.2, marginBottom: 4 },
+  postTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: INK1,
+    letterSpacing: -0.2,
+    marginBottom: 4,
+  },
   postBody: { fontSize: 13, color: INK2, lineHeight: 20, marginBottom: 10 },
   postFooter: { flexDirection: "row", gap: 14 },
   postAction: { flexDirection: "row", alignItems: "center", gap: 4 },
@@ -335,7 +374,13 @@ const styles = StyleSheet.create({
   fabText: { color: "#fff", fontSize: 26, fontWeight: "800", lineHeight: 28 },
   certContent: { padding: 20 },
   certRow: { gap: 10, marginBottom: 10 },
-  certNote: { fontSize: 11, color: INK3, fontWeight: "700", marginBottom: 10, letterSpacing: 0.4 },
+  certNote: {
+    fontSize: 11,
+    color: INK3,
+    fontWeight: "700",
+    marginBottom: 10,
+    letterSpacing: 0.4,
+  },
   certCard: {
     flex: 1,
     backgroundColor: "#fff",
@@ -352,7 +397,12 @@ const styles = StyleSheet.create({
   },
   certImgText: { fontSize: 11, color: INK3 },
   certInfo: { padding: 10 },
-  certTut: { fontSize: 10, fontWeight: "700", color: PRIMARY, letterSpacing: 0.3 },
+  certTut: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: PRIMARY,
+    letterSpacing: 0.3,
+  },
   certName: { fontSize: 12, fontWeight: "700", color: INK1, marginTop: 2 },
   certTime: { fontSize: 10, color: INK3, marginTop: 2 },
 });

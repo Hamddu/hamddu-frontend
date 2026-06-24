@@ -93,7 +93,7 @@ export async function pickAndUploadImage(
       type: "image/jpeg",
     } as any);
 
-    const res = await fetch(`${API_BASE_URL}/api/media/upload`, {
+    const res = await fetch(`${API_BASE_URL}/api/media`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
       body: form,
