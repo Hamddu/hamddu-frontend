@@ -8,27 +8,45 @@ import {
   FlatList,
   ActivityIndicator,
   TouchableOpacity,
+  Image,
+  useWindowDimensions,
 } from "react-native";
-import {
-  Card,
-  Text,
-  IconButton,
-  TextInput,
-  Button,
-  Avatar,
-} from "react-native-paper";
+import { Text, TextInput, Button, Avatar } from "react-native-paper";
+import RenderHtml from "react-native-render-html";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
-import { usePost, useLikePost } from "../hooks/usePosts";
+import { usePost, useToggleLike } from "../hooks/usePosts";
 import { useComments, useAddComment } from "../hooks/useComments";
 import { CommunityStackParamList } from "../types/navigation";
 import CommentItem from "../components/CommentItem";
 import { getMyProfile } from "../api/users.api";
 
+const PRIMARY = "#FF7325";
+const PRIMARY_SOFT = "#FFE6D6";
+const PRIMARY_DEEP = "#C7521A";
+const INK1 = "#1A1A1A";
+const INK2 = "#404040";
+const INK3 = "#8A8A8A";
+const LINE = "#ECECEC";
+const WHITE = "#FFFFFF";
+
 type PostDetailRouteProp = RouteProp<CommunityStackParamList, "PostDetail">;
 type NavigationProp = NativeStackNavigationProp<CommunityStackParamList>;
+
+function getTimeAgo(dateStr: string): string {
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diffMs / 60000);
+  const h = Math.floor(diffMs / 3600000);
+  const d = Math.floor(diffMs / 86400000);
+  if (m < 1) return "방금 전";
+  if (m < 60) return `${m}분 전`;
+  if (h < 24) return `${h}시간 전`;
+  if (d < 7) return `${d}일 전`;
+  const dt = new Date(dateStr);
+  return `${dt.getMonth() + 1}월 ${dt.getDate()}일`;
+}
 
 export default function PostDetailScreen() {
   const route = useRoute<PostDetailRouteProp>();
@@ -38,43 +56,34 @@ export default function PostDetailScreen() {
   const { data: post, isLoading: postLoading } = usePost(postId);
   const { data: comments, isLoading: commentsLoading } = useComments(postId);
   const { data: myProfile } = useQuery({ queryKey: ["profile", "me"], queryFn: getMyProfile });
-  const likeMutation = useLikePost();
+  const { toggle: toggleLike } = useToggleLike();
   const addCommentMutation = useAddComment();
 
+  const { width: contentWidth } = useWindowDimensions();
   const [commentText, setCommentText] = useState("");
 
   const handleLikePress = () => {
-    if (post) {
-      likeMutation.mutate(post.id);
-    }
+    if (post) toggleLike(post);
   };
 
   const handleAddComment = () => {
     if (!commentText.trim()) return;
-
     addCommentMutation.mutate(
-      {
-        postId,
-        body: commentText,
-      },
-      {
-        onSuccess: () => {
-          setCommentText("");
-        },
-      }
+      { postId, body: commentText },
+      { onSuccess: () => setCommentText("") }
     );
   };
 
   const handleAuthorPress = () => {
     if (post) {
-      navigation.navigate("UserProfile", { authorName: post.author?.nickname ?? '익명' });
+      navigation.navigate("UserProfile", { authorName: post.author?.nickname ?? "익명" });
     }
   };
 
   if (postLoading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#5A37A2" />
+        <ActivityIndicator size="large" color={PRIMARY} />
       </View>
     );
   }
@@ -87,6 +96,11 @@ export default function PostDetailScreen() {
     );
   }
 
+  const categoryName = post.category?.name ?? "";
+  const authorName = post.author?.nickname ?? "익명";
+  const media = (post as any).media ?? [];
+  const tags = (post as any).tags ?? [];
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -94,49 +108,102 @@ export default function PostDetailScreen() {
       keyboardVerticalOffset={90}
     >
       <ScrollView style={styles.scrollView}>
-        {/* 게시물 정보 */}
-        <Card style={styles.postCard}>
-          {/* 작성자 정보 */}
-          <TouchableOpacity onPress={handleAuthorPress}>
-            <Card.Content style={styles.authorSection}>
-              <Avatar.Icon
-                size={40}
-                icon="account"
-                style={styles.avatar}
-                color="#FFFFFF"
-              />
-              <Text style={styles.authorName}>{post.author?.nickname ?? '익명'}</Text>
-            </Card.Content>
-          </TouchableOpacity>
+        {/* 카테고리 */}
+        {categoryName ? (
+          <View style={styles.categorySection}>
+            <Text style={styles.categoryLabel}>{categoryName}</Text>
+          </View>
+        ) : null}
 
-          {/* 제목과 내용 */}
-          <Card.Content>
-            <Text style={styles.title}>{post.title}</Text>
-            <Text style={styles.description}>{post.body}</Text>
-          </Card.Content>
-
-          {/* 좋아요 버튼 */}
-          <Card.Content style={styles.actionSection}>
-            <View style={styles.actionRow}>
-              <IconButton
-                icon={post.likedByMe ? "heart" : "heart-outline"}
-                size={28}
-                iconColor="#5A37A2"
-                onPress={handleLikePress}
-              />
-              <Text style={styles.likes}>{post.likeCount}명이 좋아합니다</Text>
+        {/* 작성자 영역 */}
+        <View style={styles.authorSection}>
+          <TouchableOpacity onPress={handleAuthorPress} style={styles.authorLeft}>
+            <Avatar.Icon
+              size={40}
+              icon="account"
+              style={styles.avatar}
+              color={WHITE}
+            />
+            <View style={styles.authorInfo}>
+              <View style={styles.authorNameRow}>
+                <Text style={styles.authorName}>{authorName}</Text>
+                <View style={styles.levelBadge}>
+                  <Text style={styles.levelText}>Lv.7</Text>
+                </View>
+              </View>
+              <Text style={styles.authorMeta}>{getTimeAgo(post.createdAt)} · 조회 {(post as any).viewCount ?? 132}</Text>
             </View>
-          </Card.Content>
-        </Card>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.followBtn}>
+            <Text style={styles.followBtnText}>+ 팔로우</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* 게시글 본문 영역 */}
+        <View style={styles.bodySection}>
+          <Text style={styles.categoryChip}>{categoryName}</Text>
+          <Text style={styles.postTitle}>{post.title}</Text>
+          <RenderHtml
+            contentWidth={contentWidth - 40}
+            source={{ html: post.body }}
+            baseStyle={styles.htmlBody}
+          />
+
+          {/* 태그 */}
+          {tags.length > 0 && (
+            <View style={styles.tagsRow}>
+              {tags.map((tag: string, i: number) => (
+                <Text key={i} style={styles.tagText}>#{tag}</Text>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* 미디어 이미지 */}
+        {media.length > 0 && (
+          <ScrollView
+            horizontal
+            style={styles.mediaScroll}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.mediaContent}
+          >
+            {media.map((m: any, i: number) => (
+              <Image
+                key={m.url ?? i}
+                source={{ uri: m.url ?? m }}
+                style={styles.mediaImage}
+                resizeMode="cover"
+              />
+            ))}
+          </ScrollView>
+        )}
+
+        {/* 액션 바 */}
+        <View style={styles.actionBar}>
+          <TouchableOpacity onPress={handleLikePress} style={styles.actionBtn}>
+            <Text style={[styles.actionIcon, post.likedByMe && { color: PRIMARY }]}>
+              {post.likedByMe ? "♥" : "♡"}
+            </Text>
+            <Text style={styles.actionCount}>{post.likeCount}</Text>
+          </TouchableOpacity>
+          <View style={styles.actionBtn}>
+            <Text style={styles.actionIcon}>💬</Text>
+            <Text style={styles.actionCount}>{post.commentCount}</Text>
+          </View>
+          <TouchableOpacity style={styles.actionBtn}>
+            <Text style={styles.actionIcon}>⋮</Text>
+            <Text style={styles.actionLabel}>공유</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* 댓글 섹션 */}
         <View style={styles.commentsSection}>
           <Text style={styles.commentsTitle}>
-            댓글 {comments?.length || 0}개
+            댓글 {comments?.length || 0}
           </Text>
 
           {commentsLoading ? (
-            <ActivityIndicator size="small" color="#5A37A2" />
+            <ActivityIndicator size="small" color={PRIMARY} />
           ) : comments && comments.length > 0 ? (
             <FlatList
               data={comments}
@@ -159,13 +226,14 @@ export default function PostDetailScreen() {
         <TextInput
           value={commentText}
           onChangeText={setCommentText}
-          placeholder="댓글을 입력하세요"
+          placeholder="따뜻한 댓글을 남겨주세요..."
           mode="outlined"
           style={styles.commentInput}
-          outlineColor="#E0E0E0"
-          activeOutlineColor="#5A37A2"
+          outlineColor={LINE}
+          activeOutlineColor={PRIMARY}
           multiline
           maxLength={500}
+          theme={{ colors: { onSurfaceVariant: INK3 } }}
         />
         <Button
           mode="contained"
@@ -173,9 +241,10 @@ export default function PostDetailScreen() {
           loading={addCommentMutation.isPending}
           disabled={!commentText.trim() || addCommentMutation.isPending}
           style={styles.submitButton}
-          buttonColor="#5A37A2"
+          buttonColor={PRIMARY}
+          labelStyle={styles.submitLabel}
         >
-          작성
+          전송
         </Button>
       </View>
     </KeyboardAvoidingView>
@@ -185,101 +254,204 @@ export default function PostDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: WHITE,
   },
   centerContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#F5F5F5",
+    backgroundColor: WHITE,
   },
   errorText: {
-    color: "#999999",
+    color: INK3,
     fontSize: 16,
   },
   scrollView: {
     flex: 1,
   },
-  image: {
-    width: "100%",
-    height: 400,
-    backgroundColor: "#E0E0E0",
+  categorySection: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 12,
   },
-  postCard: {
-    margin: 0,
-    marginBottom: 8,
-    backgroundColor: "#FFFFFF",
+  categoryLabel: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: INK1,
   },
   authorSection: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: LINE,
   },
-  avatar: {
-    backgroundColor: "#5A37A2",
-  },
-  authorName: {
-    marginLeft: 12,
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333333",
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#333333",
-    marginBottom: 8,
-  },
-  description: {
-    fontSize: 16,
-    color: "#666666",
-    lineHeight: 24,
-  },
-  actionSection: {
-    paddingTop: 8,
-  },
-  actionRow: {
+  authorLeft: {
     flexDirection: "row",
     alignItems: "center",
-    marginLeft: -8,
+    flex: 1,
   },
-  likes: {
+  avatar: {
+    backgroundColor: PRIMARY_SOFT,
+  },
+  authorInfo: {
+    marginLeft: 10,
+  },
+  authorNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  authorName: {
     fontSize: 14,
+    fontWeight: "800",
+    color: INK1,
+  },
+  levelBadge: {
+    backgroundColor: PRIMARY_SOFT,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  levelText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: PRIMARY,
+  },
+  authorMeta: {
+    fontSize: 11,
+    fontWeight: "400",
+    color: INK3,
+    marginTop: 1,
+  },
+  followBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: PRIMARY,
+  },
+  followBtnText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: PRIMARY,
+  },
+  bodySection: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 12,
+  },
+  categoryChip: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: PRIMARY,
+    marginBottom: 6,
+  },
+  postTitle: {
+    fontSize: 21,
+    fontWeight: "800",
+    color: INK1,
+    lineHeight: 27.3,
+    marginBottom: 10,
+  },
+  htmlBody: {
+    color: INK2,
+    fontSize: 14,
+    lineHeight: 23.1,
+  },
+  tagsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 12,
+  },
+  tagText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: PRIMARY_DEEP,
+  },
+  mediaScroll: {
+    marginTop: 4,
+  },
+  mediaContent: {
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  mediaImage: {
+    width: 268,
+    height: 200,
+    borderRadius: 10,
+    backgroundColor: WHITE,
+  },
+  actionBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: LINE,
+    gap: 20,
+  },
+  actionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  actionIcon: {
+    fontSize: 13,
+    color: INK3,
+  },
+  actionCount: {
+    fontSize: 12,
     fontWeight: "600",
-    color: "#333333",
+    color: INK3,
+  },
+  actionLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: INK3,
   },
   commentsSection: {
-    backgroundColor: "#FFFFFF",
     paddingTop: 16,
+    paddingBottom: 20,
   },
   commentsTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333333",
-    paddingHorizontal: 16,
-    marginBottom: 12,
+    fontSize: 14,
+    fontWeight: "700",
+    color: INK1,
+    paddingHorizontal: 20,
+    marginBottom: 4,
   },
   noComments: {
     fontSize: 14,
-    color: "#999999",
+    color: INK3,
     textAlign: "center",
     paddingVertical: 32,
   },
   commentInputContainer: {
     flexDirection: "row",
-    padding: 12,
-    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: WHITE,
     borderTopWidth: 1,
-    borderTopColor: "#E0E0E0",
+    borderTopColor: LINE,
     alignItems: "flex-end",
+    gap: 8,
   },
   commentInput: {
     flex: 1,
-    marginRight: 8,
     maxHeight: 100,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: WHITE,
+    fontSize: 13,
   },
   submitButton: {
-    marginBottom: 4,
+    borderRadius: 20,
+    marginBottom: 2,
+  },
+  submitLabel: {
+    fontSize: 13,
+    fontWeight: "700",
   },
 });

@@ -7,13 +7,14 @@ import {
   FlatList,
   ActivityIndicator,
   ScrollView,
+  Image,
 } from "react-native";
 import { useScreenshotProtection } from "../hooks/useScreenshotProtection";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
-import { usePosts, useLikePost } from "../hooks/usePosts";
+import { usePosts, useToggleLike } from "../hooks/usePosts";
 import { Post } from "../store/postStore";
 import { challengesApi } from "../services/api";
 import { CommunityStackParamList } from "../types/navigation";
@@ -43,6 +44,14 @@ const CATEGORIES = [
   { k: "free", label: "자유" },
 ];
 
+function getCategoryLabel(catName: string): string {
+  return catName.replace(/^뜨개\s*/, "");
+}
+
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").trim();
+}
+
 function PostListItem({
   post,
   onPress,
@@ -52,47 +61,67 @@ function PostListItem({
   onPress: () => void;
   onLike: () => void;
 }) {
+  const avatarText = (post.author?.nickname ?? "??").slice(0, 2);
+  const media = (post as any).media ?? [];
+  const catName = getCategoryLabel(post.category?.name ?? "");
+  const hasMedia = media.length > 0;
+
   return (
     <TouchableOpacity
       style={styles.postItem}
       onPress={onPress}
       activeOpacity={0.8}
     >
-      <View style={styles.postHeader}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {(post.author?.nickname ?? "??").slice(0, 2)}
-          </Text>
-        </View>
-        <View style={styles.postMeta}>
-          <Text style={styles.postAuthor}>
-            {post.author?.nickname ?? "익명"}
-          </Text>
-          <Text style={styles.postTime}>{getTimeAgo(post.createdAt)}</Text>
-        </View>
+      <View style={styles.avatar}>
+        <Text style={styles.avatarText}>{avatarText}</Text>
       </View>
-      <Text style={styles.postTitle} numberOfLines={1}>
-        {post.title}
-      </Text>
-      <Text style={styles.postBody} numberOfLines={2}>
-        {post.body}
-      </Text>
-      <View style={styles.postFooter}>
-        <TouchableOpacity style={styles.postAction} onPress={onLike}>
-          <Text
-            style={[
-              styles.postActionIcon,
-              post.likedByMe && { color: PRIMARY },
-            ]}
-          >
-            ♥
+      <View style={styles.postBodyArea}>
+        <View style={styles.postBodyContent}>
+          <View style={styles.postAuthorRow}>
+            <Text style={styles.postAuthor} numberOfLines={1}>
+              {post.author?.nickname ?? "익명"}
+            </Text>
+            <Text style={styles.postDot}>·</Text>
+            <Text style={styles.postTime}>{getTimeAgo(post.createdAt)}</Text>
+          </View>
+          {catName ? (
+            <View style={styles.postCatChip}>
+              <Text style={styles.postCatText}>{catName}</Text>
+            </View>
+          ) : null}
+          <Text style={styles.postTitle} numberOfLines={1}>
+            {post.title}
           </Text>
-          <Text style={styles.postActionText}>{post.likeCount}</Text>
-        </TouchableOpacity>
-        <View style={styles.postAction}>
-          <Text style={styles.postActionIcon}>💬</Text>
-          <Text style={styles.postActionText}>{post.commentCount}</Text>
+          <Text style={styles.postBody} numberOfLines={2}>
+            {stripHtml(post.body)}
+          </Text>
+          <View style={styles.postFooterRow}>
+            <View style={styles.postFooterActions}>
+              <TouchableOpacity style={styles.postAction} onPress={onLike}>
+                <Text
+                  style={[
+                    styles.postActionIcon,
+                    post.likedByMe && { color: PRIMARY },
+                  ]}
+                >
+                  ♥
+                </Text>
+                <Text style={styles.postActionText}>{post.likeCount}</Text>
+              </TouchableOpacity>
+              <View style={styles.postAction}>
+                <Text style={styles.postActionIcon}>💬</Text>
+                <Text style={styles.postActionText}>{post.commentCount}</Text>
+              </View>
+            </View>
+          </View>
         </View>
+        {hasMedia && (
+          <Image
+            source={{ uri: media[0].url ?? media[0] }}
+            style={styles.postThumb}
+            resizeMode="cover"
+          />
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -106,7 +135,7 @@ export default function CommunityScreen() {
     queryKey: ["challenges"],
     queryFn: challengesApi.getChallenges,
   });
-  const likeMutation = useLikePost();
+  const { toggle: toggleLike } = useToggleLike();
   const [tab, setTab] = useState<Tab>("post");
   const [cat, setCat] = useState("all");
 
@@ -176,7 +205,7 @@ export default function CommunityScreen() {
                   onPress={() =>
                     navigation.navigate("PostDetail", { postId: item.id })
                   }
-                  onLike={() => likeMutation.mutate(item.id)}
+                  onLike={() => toggleLike(item)}
                 />
               )}
             />
@@ -319,17 +348,12 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
 
   postItem: {
+    flexDirection: "row",
     backgroundColor: "#fff",
     padding: 16,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: LINE,
-  },
-  postHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 10,
   },
   avatar: {
     width: 32,
@@ -340,9 +364,32 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   avatarText: { fontSize: 12, fontWeight: "800", color: PRIMARY_DEEP },
-  postMeta: {},
+  postBodyArea: {
+    flex: 1,
+    marginLeft: 10,
+    flexDirection: "row",
+  },
+  postBodyContent: {
+    flex: 1,
+  },
+  postAuthorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    marginBottom: 3,
+  },
   postAuthor: { fontSize: 13, fontWeight: "700", color: INK1 },
+  postDot: { fontSize: 11, color: INK3 },
   postTime: { fontSize: 11, color: INK3 },
+  postCatChip: {
+    alignSelf: "flex-start",
+    marginBottom: 5,
+  },
+  postCatText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: PRIMARY,
+  },
   postTitle: {
     fontSize: 15,
     fontWeight: "800",
@@ -350,11 +397,24 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
     marginBottom: 4,
   },
-  postBody: { fontSize: 13, color: INK2, lineHeight: 20, marginBottom: 10 },
-  postFooter: { flexDirection: "row", gap: 14 },
+  postBody: { fontSize: 13, color: INK2, lineHeight: 19.5, marginBottom: 6 },
+  postFooterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  postFooterActions: { flexDirection: "row", gap: 14 },
   postAction: { flexDirection: "row", alignItems: "center", gap: 4 },
   postActionIcon: { fontSize: 13, color: INK3 },
   postActionText: { fontSize: 12, color: INK3, fontWeight: "600" },
+  postThumb: {
+    width: 72,
+    height: 72,
+    borderRadius: 8,
+    backgroundColor: "#F2F2F2",
+    marginLeft: 10,
+    alignSelf: "center",
+  },
   fab: {
     position: "absolute",
     right: 18,

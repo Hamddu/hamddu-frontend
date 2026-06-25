@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import axios from "axios";
 import { postsApi } from '../services/api';
 import { Post } from '../store/postStore';
 
@@ -48,22 +49,49 @@ export const useLikePost = () => {
   return useMutation({
     mutationFn: postsApi.likePost,
     onMutate: async (postId: string) => {
-      await queryClient.cancelQueries({ queryKey: postKeys.lists() });
-      const previousPosts = queryClient.getQueryData<Post[]>(postKeys.lists());
-      queryClient.setQueryData<Post[]>(postKeys.lists(), (old) =>
+      await queryClient.cancelQueries({ queryKey: postKeys.all });
+      const previousLists = queryClient.getQueriesData<Post[]>({ queryKey: postKeys.lists() });
+      const previousDetail = queryClient.getQueryData<Post>(postKeys.detail(postId));
+      queryClient.setQueriesData<Post[]>({ queryKey: postKeys.lists() }, (old) =>
         old?.map((p) =>
           p.id === postId ? { ...p, likeCount: p.likeCount + 1, likedByMe: true } : p
         )
       );
-      return { previousPosts };
+      queryClient.setQueryData<Post>(postKeys.detail(postId), (old) =>
+        old ? { ...old, likeCount: old.likeCount + 1, likedByMe: true } : old
+      );
+      return { previousLists, previousDetail };
     },
-    onError: (_err, _postId, context) => {
-      if (context?.previousPosts) {
-        queryClient.setQueryData(postKeys.lists(), context.previousPosts);
+    onError: (err, postId, context) => {
+      if (axios.isAxiosError(err) && err.response?.status === 409) {
+        queryClient.setQueryData<Post>(postKeys.detail(postId), (old) =>
+          old ? { ...old, likedByMe: true } : old
+        );
+        queryClient.setQueriesData<Post[]>({ queryKey: postKeys.lists() }, (old) =>
+          old?.map((p) =>
+            p.id === postId ? { ...p, likedByMe: true } : p
+          )
+        );
+        return;
+      }
+      if (context?.previousLists) {
+        for (const [key, data] of context.previousLists) {
+          queryClient.setQueryData(key, data);
+        }
+      }
+      if (context?.previousDetail) {
+        queryClient.setQueryData(postKeys.detail(postId), context.previousDetail);
       }
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: postKeys.lists() });
+    onSuccess: (data, postId) => {
+      queryClient.setQueryData<Post>(postKeys.detail(postId), (old) =>
+        old ? { ...old, likeCount: data.likeCount, likedByMe: data.isLiked } : old
+      );
+      queryClient.setQueriesData<Post[]>({ queryKey: postKeys.lists() }, (old) =>
+        old?.map((p) =>
+          p.id === postId ? { ...p, likeCount: data.likeCount, likedByMe: data.isLiked } : p
+        )
+      );
     },
   });
 };
@@ -72,8 +100,63 @@ export const useUnlikePost = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: postsApi.unlikePost,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: postKeys.all });
+    onMutate: async (postId: string) => {
+      await queryClient.cancelQueries({ queryKey: postKeys.all });
+      const previousLists = queryClient.getQueriesData<Post[]>({ queryKey: postKeys.lists() });
+      const previousDetail = queryClient.getQueryData<Post>(postKeys.detail(postId));
+      queryClient.setQueriesData<Post[]>({ queryKey: postKeys.lists() }, (old) =>
+        old?.map((p) =>
+          p.id === postId ? { ...p, likeCount: p.likeCount - 1, likedByMe: false } : p
+        )
+      );
+      queryClient.setQueryData<Post>(postKeys.detail(postId), (old) =>
+        old ? { ...old, likeCount: old.likeCount - 1, likedByMe: false } : old
+      );
+      return { previousLists, previousDetail };
+    },
+    onError: (err, postId, context) => {
+      if (axios.isAxiosError(err) && err.response?.status === 404) {
+        queryClient.setQueryData<Post>(postKeys.detail(postId), (old) =>
+          old ? { ...old, likedByMe: false } : old
+        );
+        queryClient.setQueriesData<Post[]>({ queryKey: postKeys.lists() }, (old) =>
+          old?.map((p) =>
+            p.id === postId ? { ...p, likedByMe: false } : p
+          )
+        );
+        return;
+      }
+      if (context?.previousLists) {
+        for (const [key, data] of context.previousLists) {
+          queryClient.setQueryData(key, data);
+        }
+      }
+      if (context?.previousDetail) {
+        queryClient.setQueryData(postKeys.detail(postId), context.previousDetail);
+      }
+    },
+    onSuccess: (data, postId) => {
+      queryClient.setQueryData<Post>(postKeys.detail(postId), (old) =>
+        old ? { ...old, likeCount: data.likeCount, likedByMe: data.isLiked } : old
+      );
+      queryClient.setQueriesData<Post[]>({ queryKey: postKeys.lists() }, (old) =>
+        old?.map((p) =>
+          p.id === postId ? { ...p, likeCount: data.likeCount, likedByMe: data.isLiked } : p
+        )
+      );
     },
   });
+};
+
+export const useToggleLike = () => {
+  const likeMutation = useLikePost();
+  const unlikeMutation = useUnlikePost();
+  const toggle = (post: Post) => {
+    if (post.likedByMe) {
+      unlikeMutation.mutate(post.id);
+    } else {
+      likeMutation.mutate(post.id);
+    }
+  };
+  return { toggle, isPending: likeMutation.isPending || unlikeMutation.isPending };
 };

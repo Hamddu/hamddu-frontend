@@ -75,12 +75,14 @@ export const postsApi = {
     return res.data;
   },
 
-  likePost: async (id: string): Promise<void> => {
-    await apiClient.post(`/api/boards/${id}/like`);
+  likePost: async (id: string): Promise<{ boardId: string; likeCount: number; isLiked: boolean }> => {
+    const res = await apiClient.post(`/api/boards/${id}/like`);
+    return res.data;
   },
 
-  unlikePost: async (id: string): Promise<void> => {
-    await apiClient.delete(`/api/boards/${id}/like`);
+  unlikePost: async (id: string): Promise<{ boardId: string; likeCount: number; isLiked: boolean }> => {
+    const res = await apiClient.delete(`/api/boards/${id}/like`);
+    return res.data;
   },
 };
 
