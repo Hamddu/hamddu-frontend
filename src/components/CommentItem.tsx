@@ -14,6 +14,8 @@ interface CommentItemProps {
   comment: Comment;
   currentUser?: string;
   onDelete?: (commentId: string) => void;
+  onLike?: (comment: Comment) => void;
+  onReply?: (comment: Comment) => void;
   depth?: number;
 }
 
@@ -34,20 +36,22 @@ export default function CommentItem({
   comment,
   currentUser = "",
   onDelete,
+  onLike,
+  onReply,
   depth = 0,
 }: CommentItemProps) {
   const authorName = comment.author?.nickname ?? "익명";
   const isOwner = authorName === currentUser;
   const timeAgo = getTimeAgo(comment.createdAt);
-  const [showReplies, setShowReplies] = useState(false);
+  const [showReplies, setShowReplies] = useState(depth === 0);
   const children = comment.children ?? [];
   const hasReplies = children.length > 0;
 
   return (
-    <View style={[styles.container, depth > 0 && { paddingLeft: 44 + 12 }]}>
+    <View style={[styles.container, depth > 0 && { paddingLeft: 44 }]}>
       {/* 아바타 */}
-      <View style={[styles.avatar, depth > 0 && { width: 24, height: 24, borderRadius: 12 }]}>
-        <Text style={[styles.avatarText, depth > 0 && { fontSize: 9 }]}>
+      <View style={[styles.avatar, depth > 0 && styles.childAvatar]}>
+        <Text style={[styles.avatarText, depth > 0 && styles.childAvatarText]}>
           {authorName.slice(0, 2)}
         </Text>
       </View>
@@ -55,8 +59,8 @@ export default function CommentItem({
       <View style={styles.content}>
         {/* 작성자 + 시간 */}
         <View style={styles.header}>
-          <Text style={[styles.author, depth > 0 && { fontSize: 12 }]}>{authorName}</Text>
-          <Text style={[styles.time, depth > 0 && { fontSize: 10 }]}>{timeAgo}</Text>
+          <Text style={[styles.author, depth > 0 && styles.childAuthor]}>{authorName}</Text>
+          <Text style={styles.time}>{timeAgo}</Text>
           {isOwner && onDelete && (
             <TouchableOpacity onPress={() => onDelete(comment.id)} style={styles.deleteBtn}>
               <Text style={styles.deleteText}>삭제</Text>
@@ -67,42 +71,41 @@ export default function CommentItem({
         {/* 댓글 내용 */}
         <Text style={styles.text}>{comment.body}</Text>
 
-        {/* 좋아요 + 답글 */}
         <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.likeBtn}>
-            <Text style={styles.likeIcon}>♡</Text>
+          <TouchableOpacity style={styles.likeBtn} onPress={() => onLike?.(comment)}>
+            <Text style={[styles.likeIcon, comment.likedByMe && { color: PRIMARY }]}>
+              {comment.likedByMe ? "♥" : "♡"}
+            </Text>
             <Text style={styles.likeCount}>{comment.likeCount}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.replyBtn}>
+          <TouchableOpacity onPress={() => onReply?.(comment)}>
             <Text style={styles.replyText}>답글 달기</Text>
           </TouchableOpacity>
         </View>
 
-        {/* 대댓글 보기 버튼 */}
         {hasReplies && (
           <TouchableOpacity
             style={styles.viewRepliesBtn}
-            onPress={() => setShowReplies(!showReplies)}
+            onPress={() => setShowReplies((show) => !show)}
           >
             <View style={styles.repliesLine} />
             <Text style={styles.viewRepliesText}>
-              답글 {children.length}개 보기 {showReplies ? "↑" : "↓"}
+              답글 {children.length}개 {showReplies ? "접기" : "보기"}
             </Text>
           </TouchableOpacity>
         )}
 
-        {/* 대댓글 목록 */}
-        {showReplies &&
-          hasReplies &&
-          children.map((child) => (
-            <CommentItem
-              key={child.id}
-              comment={child}
-              currentUser={currentUser}
-              onDelete={onDelete}
-              depth={depth + 1}
-            />
-          ))}
+        {showReplies && children.map((child) => (
+          <CommentItem
+            key={child.id}
+            comment={child}
+            currentUser={currentUser}
+            onDelete={onDelete}
+            onLike={onLike}
+            onReply={onReply}
+            depth={depth + 1}
+          />
+        ))}
       </View>
     </View>
   );
@@ -128,6 +131,14 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: PRIMARY,
   },
+  childAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+  },
+  childAvatarText: {
+    fontSize: 9,
+  },
   content: {
     flex: 1,
     marginLeft: 10,
@@ -142,6 +153,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     color: INK1,
+  },
+  childAuthor: {
+    fontSize: 12,
   },
   time: {
     fontSize: 11,
@@ -179,7 +193,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: INK3,
   },
-  replyBtn: {},
   replyText: {
     fontSize: 11,
     fontWeight: "600",

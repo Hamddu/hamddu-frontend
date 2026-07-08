@@ -10,15 +10,16 @@ import {
   TouchableOpacity,
   Image,
   useWindowDimensions,
+  Alert,
+  Share,
 } from "react-native";
 import { Text, TextInput, Button, Avatar } from "react-native-paper";
 import RenderHtml from "react-native-render-html";
-import { useRoute, useNavigation } from "@react-navigation/native";
+import { useRoute } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
 import { usePost, useToggleLike } from "../hooks/usePosts";
-import { useComments, useAddComment } from "../hooks/useComments";
+import { useComments, useAddComment, useDeleteComment, useToggleCommentLike } from "../hooks/useComments";
 import { CommunityStackParamList } from "../types/navigation";
 import CommentItem from "../components/CommentItem";
 import { getMyProfile } from "../api/users.api";
@@ -33,7 +34,6 @@ const LINE = "#ECECEC";
 const WHITE = "#FFFFFF";
 
 type PostDetailRouteProp = RouteProp<CommunityStackParamList, "PostDetail">;
-type NavigationProp = NativeStackNavigationProp<CommunityStackParamList>;
 
 function getTimeAgo(dateStr: string): string {
   const diffMs = Date.now() - new Date(dateStr).getTime();
@@ -48,9 +48,12 @@ function getTimeAgo(dateStr: string): string {
   return `${dt.getMonth() + 1}월 ${dt.getDate()}일`;
 }
 
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+}
+
 export default function PostDetailScreen() {
   const route = useRoute<PostDetailRouteProp>();
-  const navigation = useNavigation<NavigationProp>();
   const { postId } = route.params;
 
   const { data: post, isLoading: postLoading } = usePost(postId);
@@ -58,9 +61,12 @@ export default function PostDetailScreen() {
   const { data: myProfile } = useQuery({ queryKey: ["profile", "me"], queryFn: getMyProfile });
   const { toggle: toggleLike } = useToggleLike();
   const addCommentMutation = useAddComment();
+  const deleteCommentMutation = useDeleteComment();
+  const toggleCommentLikeMutation = useToggleCommentLike();
 
   const { width: contentWidth } = useWindowDimensions();
   const [commentText, setCommentText] = useState("");
+  const [replyTo, setReplyTo] = useState<{ id: string; nickname: string } | null>(null);
 
   const handleLikePress = () => {
     if (post) toggleLike(post);
@@ -69,15 +75,32 @@ export default function PostDetailScreen() {
   const handleAddComment = () => {
     if (!commentText.trim()) return;
     addCommentMutation.mutate(
-      { postId, body: commentText },
-      { onSuccess: () => setCommentText("") }
+      { postId, body: commentText, parentId: replyTo?.id },
+      {
+        onSuccess: () => {
+          setCommentText("");
+          setReplyTo(null);
+        },
+      },
     );
   };
 
-  const handleAuthorPress = () => {
-    if (post) {
-      navigation.navigate("UserProfile", { authorName: post.author?.nickname ?? "익명" });
-    }
+  const handleDeleteComment = (commentId: string) => {
+    Alert.alert("댓글 삭제", "댓글을 삭제할까요?", [
+      { text: "취소", style: "cancel" },
+      {
+        text: "삭제",
+        style: "destructive",
+        onPress: () => deleteCommentMutation.mutate({ postId, commentId }),
+      },
+    ]);
+  };
+
+  const handleShare = async () => {
+    await Share.share({
+      title: post?.title ?? "함뜨 게시글",
+      message: `${post?.title ?? "함뜨 게시글"}\n${stripHtml(post?.body ?? "")}`,
+    });
   };
 
   if (postLoading) {
@@ -117,7 +140,7 @@ export default function PostDetailScreen() {
 
         {/* 작성자 영역 */}
         <View style={styles.authorSection}>
-          <TouchableOpacity onPress={handleAuthorPress} style={styles.authorLeft}>
+          <View style={styles.authorLeft}>
             <Avatar.Icon
               size={40}
               icon="account"
@@ -133,10 +156,7 @@ export default function PostDetailScreen() {
               </View>
               <Text style={styles.authorMeta}>{getTimeAgo(post.createdAt)} · 조회 {(post as any).viewCount ?? 132}</Text>
             </View>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.followBtn}>
-            <Text style={styles.followBtnText}>+ 팔로우</Text>
-          </TouchableOpacity>
+          </View>
         </View>
 
         {/* 게시글 본문 영역 */}
@@ -190,7 +210,7 @@ export default function PostDetailScreen() {
             <Text style={styles.actionIcon}>💬</Text>
             <Text style={styles.actionCount}>{post.commentCount}</Text>
           </View>
-          <TouchableOpacity style={styles.actionBtn}>
+          <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
             <Text style={styles.actionIcon}>⋮</Text>
             <Text style={styles.actionLabel}>공유</Text>
           </TouchableOpacity>
@@ -208,7 +228,18 @@ export default function PostDetailScreen() {
             <FlatList
               data={comments}
               renderItem={({ item }) => (
-                <CommentItem comment={item} currentUser={myProfile?.nickname ?? ""} />
+                <CommentItem
+                  comment={item}
+                  currentUser={myProfile?.nickname ?? ""}
+                  onDelete={handleDeleteComment}
+                  onLike={(comment) => toggleCommentLikeMutation.mutate({ postId, comment })}
+                  onReply={(comment) =>
+                    setReplyTo({
+                      id: comment.id,
+                      nickname: comment.author?.nickname ?? "익명",
+                    })
+                  }
+                />
               )}
               keyExtractor={(item) => item.id}
               scrollEnabled={false}
@@ -223,29 +254,39 @@ export default function PostDetailScreen() {
 
       {/* 댓글 입력창 */}
       <View style={styles.commentInputContainer}>
-        <TextInput
-          value={commentText}
-          onChangeText={setCommentText}
-          placeholder="따뜻한 댓글을 남겨주세요..."
-          mode="outlined"
-          style={styles.commentInput}
-          outlineColor={LINE}
-          activeOutlineColor={PRIMARY}
-          multiline
-          maxLength={500}
-          theme={{ colors: { onSurfaceVariant: INK3 } }}
-        />
-        <Button
-          mode="contained"
-          onPress={handleAddComment}
-          loading={addCommentMutation.isPending}
-          disabled={!commentText.trim() || addCommentMutation.isPending}
-          style={styles.submitButton}
-          buttonColor={PRIMARY}
-          labelStyle={styles.submitLabel}
-        >
-          전송
-        </Button>
+        {replyTo && (
+          <View style={styles.replyTargetRow}>
+            <Text style={styles.replyTargetText}>@{replyTo.nickname}님에게 답글</Text>
+            <TouchableOpacity onPress={() => setReplyTo(null)}>
+              <Text style={styles.replyCancelText}>취소</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        <View style={styles.commentInputRow}>
+          <TextInput
+            value={commentText}
+            onChangeText={setCommentText}
+            placeholder={replyTo ? "답글을 남겨주세요..." : "따뜻한 댓글을 남겨주세요..."}
+            mode="outlined"
+            style={styles.commentInput}
+            outlineColor={LINE}
+            activeOutlineColor={PRIMARY}
+            multiline
+            maxLength={500}
+            theme={{ colors: { onSurfaceVariant: INK3 } }}
+          />
+          <Button
+            mode="contained"
+            onPress={handleAddComment}
+            loading={addCommentMutation.isPending}
+            disabled={!commentText.trim() || addCommentMutation.isPending}
+            style={styles.submitButton}
+            buttonColor={PRIMARY}
+            labelStyle={styles.submitLabel}
+          >
+            전송
+          </Button>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -325,18 +366,6 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     color: INK3,
     marginTop: 1,
-  },
-  followBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: PRIMARY,
-  },
-  followBtnText: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: PRIMARY,
   },
   bodySection: {
     paddingHorizontal: 20,
@@ -431,12 +460,31 @@ const styles = StyleSheet.create({
     paddingVertical: 32,
   },
   commentInputContainer: {
-    flexDirection: "row",
     paddingHorizontal: 12,
     paddingVertical: 10,
     backgroundColor: WHITE,
     borderTopWidth: 1,
     borderTopColor: LINE,
+    gap: 8,
+  },
+  replyTargetRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 4,
+  },
+  replyTargetText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: PRIMARY,
+  },
+  replyCancelText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: INK3,
+  },
+  commentInputRow: {
+    flexDirection: "row",
     alignItems: "flex-end",
     gap: 8,
   },

@@ -8,14 +8,12 @@ export type RootTabParamList = {
 export type HomeStackParamList = {
   TutorialList: undefined;
   TutorialVideo: { videoId: string; title: string; lessonIndex: number; contentId: string };
-  UserProfile: { authorName: string };
 };
 
 export type CommunityStackParamList = {
   CommunityFeed: undefined;
   PostDetail: { postId: string };
   AddPost: undefined;
-  UserProfile: { authorName: string };
 };
 
 export type CounterStackParamList = {

@@ -52,35 +52,65 @@ export interface WatchHistory {
   lastWatchedAt: string;
 }
 
+export interface LikeResult {
+  boardId?: string;
+  commentId?: string;
+  likeCount: number;
+  isLiked: boolean;
+}
+
+function unwrapList<T = any>(data: any): T[] {
+  return Array.isArray(data) ? data : (data?.data ?? data?.items ?? []);
+}
+
+function normalizePost(raw: any): Post {
+  return {
+    ...raw,
+    category: raw.category
+      ? {
+          ...raw.category,
+          name: raw.category.name ?? raw.category.label ?? "",
+        }
+      : null,
+    commentCount: raw.commentCount ?? 0,
+    likedByMe: raw.likedByMe ?? raw.isLiked ?? false,
+    media: raw.media ?? [],
+  };
+}
+
+function normalizeComment(raw: any): Comment {
+  return {
+    ...raw,
+    boardId: raw.boardId ?? raw.board?.id ?? "",
+    likedByMe: raw.likedByMe ?? raw.isLiked ?? false,
+    children: (raw.children ?? []).map(normalizeComment),
+  };
+}
+
 export const postsApi = {
   getPosts: async (categoryId?: string): Promise<Post[]> => {
     const params: Record<string, any> = { page: 1, limit: 20, sort: "latest" };
     if (categoryId) params.categoryId = categoryId;
     const res = await apiClient.get("/api/boards", { params });
-    return Array.isArray(res.data) ? res.data : (res.data.data ?? res.data.items ?? []);
-  },
-
-  getPostsByAuthor: async (authorId: string): Promise<Post[]> => {
-    const res = await apiClient.get("/api/boards", { params: { authorId } });
-    return Array.isArray(res.data) ? res.data : (res.data.data ?? res.data.items ?? []);
+    return unwrapList(res.data).map(normalizePost);
   },
 
   getPostById: async (id: string): Promise<Post | null> => {
     const res = await apiClient.get(`/api/boards/${id}`);
-    return res.data;
+    return res.data ? normalizePost(res.data) : null;
   },
 
-  addPost: async (post: { title: string; body: string; categoryId: string }): Promise<Post> => {
+  addPost: async (post: { title: string; body: string; categoryId: string; mediaIds?: string[] }): Promise<Post> => {
     const res = await apiClient.post("/api/boards", post);
-    return res.data;
+    return normalizePost(res.data);
   },
 
-  likePost: async (id: string): Promise<{ boardId: string; likeCount: number; isLiked: boolean }> => {
+  likePost: async (id: string): Promise<LikeResult> => {
     const res = await apiClient.post(`/api/boards/${id}/like`);
     return res.data;
   },
 
-  unlikePost: async (id: string): Promise<{ boardId: string; likeCount: number; isLiked: boolean }> => {
+  unlikePost: async (id: string): Promise<LikeResult> => {
     const res = await apiClient.delete(`/api/boards/${id}/like`);
     return res.data;
   },
@@ -89,24 +119,34 @@ export const postsApi = {
 export const commentsApi = {
   getCommentsByPostId: async (postId: string): Promise<Comment[]> => {
     const res = await apiClient.get(`/api/boards/${postId}/comments`);
-    return Array.isArray(res.data) ? res.data : (res.data.data ?? []);
+    return unwrapList(res.data).map(normalizeComment);
   },
 
   addComment: async (comment: { postId: string; body: string; parentId?: string }): Promise<Comment> => {
     const { postId, ...payload } = comment;
     const res = await apiClient.post(`/api/boards/${postId}/comments`, payload);
-    return res.data;
+    return normalizeComment(res.data);
   },
 
   deleteComment: async ({ postId, commentId }: { postId: string; commentId: string }): Promise<void> => {
     await apiClient.delete(`/api/boards/${postId}/comments/${commentId}`);
+  },
+
+  likeComment: async ({ postId, commentId }: { postId: string; commentId: string }): Promise<LikeResult> => {
+    const res = await apiClient.post(`/api/boards/${postId}/comments/${commentId}/like`);
+    return res.data;
+  },
+
+  unlikeComment: async ({ postId, commentId }: { postId: string; commentId: string }): Promise<LikeResult> => {
+    const res = await apiClient.delete(`/api/boards/${postId}/comments/${commentId}/like`);
+    return res.data;
   },
 };
 
 export const categoriesApi = {
   getCategories: async (): Promise<BoardCategory[]> => {
     const res = await apiClient.get("/api/boards/categories");
-    return Array.isArray(res.data) ? res.data : (res.data.data ?? res.data.items ?? []);
+    return unwrapList(res.data);
   },
 };
 

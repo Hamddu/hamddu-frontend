@@ -8,6 +8,7 @@ import {
   Modal,
   TextInput,
   BackHandler,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
@@ -284,7 +285,7 @@ function CounterDetail({
 
 // ── 프로젝트 리스트 ─────────────────────────────────────────
 export default function CounterScreen() {
-  const { projects } = useCounterStore();
+  const { projects, deleteProject } = useCounterStore();
   const [selected, setSelected] = useState<CounterProject | null>(null);
   const [newModal, setNewModal] = useState(false);
   const [newName, setNewName] = useState("새 프로젝트");
@@ -313,6 +314,17 @@ export default function CounterScreen() {
     };
     setNewModal(false);
     setSelected(newProject);
+  };
+
+  const handleDeleteProject = (project: CounterProject) => {
+    Alert.alert("프로젝트 삭제", `${project.name}을 삭제할까요?`, [
+      { text: "취소", style: "cancel" },
+      {
+        text: "삭제",
+        style: "destructive",
+        onPress: () => deleteProject(project.id),
+      },
+    ]);
   };
 
   if (selected) {
@@ -368,6 +380,16 @@ export default function CounterScreen() {
                 {item.createdAt}
               </Text>
             </View>
+            <TouchableOpacity
+              style={styles.deleteProjectBtn}
+              onPress={(event) => {
+                event.stopPropagation();
+                handleDeleteProject(item);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.deleteProjectText}>삭제</Text>
+            </TouchableOpacity>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
         )}
@@ -492,6 +514,11 @@ const styles = StyleSheet.create({
   projectName: { fontSize: 15, fontWeight: "800", color: INK1, letterSpacing: -0.2, marginBottom: 2 },
   projectMeta: { fontSize: 12, color: INK3, fontWeight: "600" },
   projectMetaBold: { color: INK2, fontWeight: "700" },
+  deleteProjectBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  deleteProjectText: { fontSize: 12, fontWeight: "700", color: "#E55B4B" },
   chevron: { fontSize: 18, color: INK3 },
   newProjectBtn: {
     marginTop: 10, borderWidth: 2, borderStyle: "dashed",

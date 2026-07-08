@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -13,14 +13,12 @@ import CommunityScreen from "./src/screens/CommunityScreen";
 import ProfileScreen from "./src/screens/ProfileScreen";
 import PostDetailScreen from "./src/screens/PostDetailScreen";
 import AddPostScreen from "./src/screens/AddPostScreen";
-import UserProfileScreen from "./src/screens/UserProfileScreen";
 import LoginScreen from "./src/screens/LoginScreen";
 import SurveyScreen from "./src/screens/SurveyScreen";
 import SurveyQuestionsScreen from "./src/screens/SurveyQuestionsScreen";
 
 import { useAuthStore } from "./src/store/authStore";
 import { useXpLevelDetection } from "./src/hooks/useXpLevelUp";
-import { registerForPushNotifications } from "./src/services/notifications";
 
 const Tab = createBottomTabNavigator();
 const HomeStack = createNativeStackNavigator();
@@ -44,11 +42,6 @@ function HomeStackNavigator() {
         component={TutorialVideoScreen}
         options={{ headerShown: false }}
       />
-      <HomeStack.Screen
-        name="UserProfile"
-        component={UserProfileScreen}
-        options={{ headerTitle: "프로필", headerStyle: { backgroundColor: "#fff" }, headerTintColor: "#1A1A1A", headerTitleStyle: { fontWeight: "800" } }}
-      />
     </HomeStack.Navigator>
   );
 }
@@ -70,11 +63,6 @@ function CommunityStackNavigator() {
         name="AddPost"
         component={AddPostScreen}
         options={{ headerTitle: "작품 등록", headerStyle: { backgroundColor: "#fff" }, headerTintColor: "#1A1A1A", headerTitleStyle: { fontWeight: "800" } }}
-      />
-      <CommunityStack.Screen
-        name="UserProfile"
-        component={UserProfileScreen}
-        options={{ headerTitle: "프로필", headerStyle: { backgroundColor: "#fff" }, headerTintColor: "#1A1A1A", headerTitleStyle: { fontWeight: "800" } }}
       />
     </CommunityStack.Navigator>
   );
@@ -153,15 +141,7 @@ function MainTabs() {
 }
 
 function AppInitializer({ children }: { children: React.ReactNode }) {
-  const accessToken = useAuthStore((s) => s.accessToken);
-
   useXpLevelDetection();
-
-  useEffect(() => {
-    if (accessToken) {
-      registerForPushNotifications();
-    }
-  }, [accessToken]);
 
   return <>{children}</>;
 }

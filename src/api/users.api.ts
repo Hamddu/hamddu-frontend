@@ -38,7 +38,3 @@ export async function submitSurvey(payload: SurveyPayload): Promise<void> {
 export async function deleteAccount(): Promise<void> {
   await apiClient.delete('/api/users/me');
 }
-
-export async function registerPushToken(token: string, platform: string): Promise<void> {
-  await apiClient.post('/api/push/register', { token, platform });
-}

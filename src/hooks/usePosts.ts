@@ -7,7 +7,6 @@ export const postKeys = {
   all: ['posts'] as const,
   lists: () => [...postKeys.all, 'list'] as const,
   list: (categoryId?: string) => [...postKeys.lists(), { categoryId }] as const,
-  byAuthor: (authorId: string) => [...postKeys.all, 'author', authorId] as const,
   detail: (id: string) => [...postKeys.all, id] as const,
 };
 
@@ -15,14 +14,6 @@ export const usePosts = (categoryId?: string) => {
   return useQuery({
     queryKey: postKeys.list(categoryId),
     queryFn: () => postsApi.getPosts(categoryId),
-  });
-};
-
-export const usePostsByAuthor = (authorId: string) => {
-  return useQuery({
-    queryKey: postKeys.byAuthor(authorId),
-    queryFn: () => postsApi.getPostsByAuthor(authorId),
-    enabled: !!authorId,
   });
 };
 

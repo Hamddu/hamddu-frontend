@@ -29,6 +29,7 @@ export default function AddPostScreen() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [mediaIds, setMediaIds] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
 
   const richEditorRef = useRef<RichEditor>(null);
@@ -49,6 +50,7 @@ export default function AddPostScreen() {
             }
             return;
           }
+          setMediaIds((ids) => [...ids, result.mediaId]);
           richEditorRef.current?.insertImage(result.url, 'style="max-width:100%;border-radius:8px;"');
         },
       },
@@ -64,6 +66,7 @@ export default function AddPostScreen() {
             }
             return;
           }
+          setMediaIds((ids) => [...ids, result.mediaId]);
           richEditorRef.current?.insertImage(result.url, 'style="max-width:100%;border-radius:8px;"');
         },
       },
@@ -89,6 +92,7 @@ export default function AddPostScreen() {
         title: title.trim(),
         body,
         categoryId,
+        mediaIds,
       });
       navigation.goBack();
     } catch {

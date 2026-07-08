@@ -8,6 +8,13 @@ export interface PostAuthor {
 export interface PostCategory {
   id: string;
   name: string;
+  label?: string;
+}
+
+export interface PostMedia {
+  id: string;
+  url: string;
+  mimeType?: string;
 }
 
 export interface Post {
@@ -20,6 +27,7 @@ export interface Post {
   commentCount: number;
   likedByMe: boolean;
   createdAt: string;
+  media?: PostMedia[];
 }
 
 export interface Comment {

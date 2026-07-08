@@ -16,7 +16,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
 import { usePosts, useToggleLike } from "../hooks/usePosts";
 import { Post } from "../store/postStore";
-import { challengesApi } from "../services/api";
+import { categoriesApi, challengesApi } from "../services/api";
 import { CommunityStackParamList } from "../types/navigation";
 
 type NavigationProp = NativeStackNavigationProp<CommunityStackParamList>;
@@ -35,15 +35,6 @@ function getTimeAgo(dateStr: string): string {
 }
 
 type Tab = "post" | "cert";
-const CATEGORIES = [
-  { k: "all", label: "전체" },
-  { k: "show", label: "뜨개 결과물 자랑" },
-  { k: "know", label: "뜨개 지식 공유" },
-  { k: "chat", label: "뜨개 사담" },
-  { k: "place", label: "장소·장비·스토어" },
-  { k: "free", label: "자유" },
-];
-
 function getCategoryLabel(catName: string): string {
   return catName.replace(/^뜨개\s*/, "");
 }
@@ -62,9 +53,8 @@ function PostListItem({
   onLike: () => void;
 }) {
   const avatarText = (post.author?.nickname ?? "??").slice(0, 2);
-  const media = (post as any).media ?? [];
   const catName = getCategoryLabel(post.category?.name ?? "");
-  const hasMedia = media.length > 0;
+  const thumbUrl = post.media?.[0]?.url;
 
   return (
     <TouchableOpacity
@@ -115,9 +105,9 @@ function PostListItem({
             </View>
           </View>
         </View>
-        {hasMedia && (
+        {thumbUrl && (
           <Image
-            source={{ uri: media[0].url ?? media[0] }}
+            source={{ uri: thumbUrl }}
             style={styles.postThumb}
             resizeMode="cover"
           />
@@ -130,23 +120,26 @@ function PostListItem({
 export default function CommunityScreen() {
   const navigation = useNavigation<NavigationProp>();
   useScreenshotProtection();
-  const { data: posts, isLoading } = usePosts();
+  const [tab, setTab] = useState<Tab>("post");
+  const [cat, setCat] = useState("all");
+  const selectedCategoryId = cat === "all" ? undefined : cat;
+  const { data: posts = [], isLoading } = usePosts(selectedCategoryId);
+  const { data: categories = [] } = useQuery({
+    queryKey: ["categories"],
+    queryFn: categoriesApi.getCategories,
+  });
   const { data: challenges = [], isLoading: challengesLoading } = useQuery({
     queryKey: ["challenges"],
     queryFn: challengesApi.getChallenges,
   });
   const { toggle: toggleLike } = useToggleLike();
-  const [tab, setTab] = useState<Tab>("post");
-  const [cat, setCat] = useState("all");
+  const categoryTabs = [{ id: "all", label: "전체" }, ...categories];
 
   return (
     <SafeAreaView style={styles.container}>
       {/* 상단 헤더 */}
       <View style={styles.header}>
         <Text style={styles.screenTitle}>커뮤니티</Text>
-        <TouchableOpacity style={styles.searchBtn}>
-          <Text style={styles.searchIcon}>🔍</Text>
-        </TouchableOpacity>
       </View>
 
       {/* 일반 / 인증 탭 */}
@@ -185,14 +178,14 @@ export default function CommunityScreen() {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.catContent}
                 >
-                  {CATEGORIES.map((c) => (
+                  {categoryTabs.map((c) => (
                     <TouchableOpacity
-                      key={c.k}
-                      style={[styles.catChip, cat === c.k && styles.catChipActive]}
-                      onPress={() => setCat(c.k)}
+                      key={c.id}
+                      style={[styles.catChip, cat === c.id && styles.catChipActive]}
+                      onPress={() => setCat(c.id)}
                       activeOpacity={0.8}
                     >
-                      <Text style={[styles.catChipText, cat === c.k && styles.catChipTextActive]}>
+                      <Text style={[styles.catChipText, cat === c.id && styles.catChipTextActive]}>
                         {c.label}
                       </Text>
                     </TouchableOpacity>
@@ -240,7 +233,11 @@ export default function CommunityScreen() {
           renderItem={({ item }) => (
             <View style={styles.certCard}>
               <View style={styles.certImg}>
-                <Text style={styles.certImgText}>인증 사진</Text>
+                {item.imageUrl ? (
+                  <Image source={{ uri: item.imageUrl }} style={styles.certImgImage} resizeMode="cover" />
+                ) : (
+                  <Text style={styles.certImgText}>인증 사진</Text>
+                )}
               </View>
               <View style={styles.certInfo}>
                 <Text style={styles.certTut}>
@@ -285,8 +282,6 @@ const styles = StyleSheet.create({
     color: INK1,
     letterSpacing: -0.4,
   },
-  searchBtn: { padding: 8 },
-  searchIcon: { fontSize: 18 },
   tabRow: {
     flexDirection: "row",
     paddingHorizontal: 20,
@@ -454,6 +449,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#F2F2F2",
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
+  },
+  certImgImage: {
+    width: "100%",
+    height: "100%",
   },
   certImgText: { fontSize: 11, color: INK3 },
   certInfo: { padding: 10 },

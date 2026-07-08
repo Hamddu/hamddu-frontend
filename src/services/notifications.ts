@@ -1,7 +1,7 @@
 import { Alert } from "react-native";
 
-export async function registerForPushNotifications(): Promise<string | null> {
-  return null;
+export async function registerForPushNotifications(): Promise<void> {
+  return;
 }
 
 export async function scheduleLocalNotification(
