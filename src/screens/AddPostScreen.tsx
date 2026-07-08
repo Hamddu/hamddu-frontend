@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { useAddPost } from '../hooks/usePosts';
 import { categoriesApi } from '../services/api';
 import { RichEditor, RichToolbar, actions } from 'react-native-pell-rich-editor';
@@ -35,6 +36,7 @@ export default function AddPostScreen() {
   const richEditorRef = useRef<RichEditor>(null);
   const addPostMutation = useAddPost();
   const navigation = useNavigation();
+  const headerHeight = useHeaderHeight();
 
   const handleInsertImage = () => {
     Alert.alert('사진 추가', '사진을 선택할 방법을 선택하세요.', [
@@ -45,7 +47,7 @@ export default function AddPostScreen() {
           const result = await pickAndUploadImage('camera');
           setUploading(false);
           if (!result.ok) {
-            if (result.error !== 'cancelled') {
+            if ('error' in result && result.error !== 'cancelled') {
               Alert.alert('사진 업로드 실패', result.error);
             }
             return;
@@ -61,7 +63,7 @@ export default function AddPostScreen() {
           const result = await pickAndUploadImage('gallery');
           setUploading(false);
           if (!result.ok) {
-            if (result.error !== 'cancelled') {
+            if ('error' in result && result.error !== 'cancelled') {
               Alert.alert('사진 업로드 실패', result.error);
             }
             return;
@@ -104,8 +106,8 @@ export default function AddPostScreen() {
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={90}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={headerHeight}
       >
         <ScrollView
           style={styles.scroll}

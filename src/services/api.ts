@@ -1,6 +1,8 @@
 import { apiClient } from "../api/client";
 import { Post, Comment } from "../store/postStore";
 
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "https://api.hamddu.online";
+
 export interface BoardCategory {
   id: string;
   label: string;
@@ -59,8 +61,45 @@ export interface LikeResult {
   isLiked: boolean;
 }
 
+export type ReportReason = "spam" | "harassment" | "inappropriate" | "copyright" | "other";
+
+export interface ReportPayload {
+  reason: ReportReason;
+  description?: string;
+}
+
 function unwrapList<T = any>(data: any): T[] {
   return Array.isArray(data) ? data : (data?.data ?? data?.items ?? []);
+}
+
+function normalizeMediaUrl(url: string): string {
+  if (/^https?:\/\//i.test(url)) return url;
+  return `${API_BASE_URL}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+
+function firstBodyImageUrl(body?: string): string | undefined {
+  return body?.match(/<img[^>]+src=["']([^"']+)["']/i)?.[1];
+}
+
+function normalizeMedia(raw: any): any[] {
+  const media = raw.media ?? raw.medias ?? raw.images ?? raw.imageUrls ?? raw.mediaUrls ?? [];
+  const list = Array.isArray(media) ? media : [media];
+  if (raw.imageUrl) list.push(raw.imageUrl);
+  if (raw.thumbnailUrl) list.push(raw.thumbnailUrl);
+  const bodyImageUrl = firstBodyImageUrl(raw.body);
+  if (bodyImageUrl) list.push(bodyImageUrl);
+  return list
+    .map((item: any) =>
+      typeof item === "string"
+        ? { id: item, url: normalizeMediaUrl(item) }
+        : {
+            ...item,
+            url: item?.url || item?.imageUrl || item?.thumbnailUrl || item?.path
+              ? normalizeMediaUrl(item.url ?? item.imageUrl ?? item.thumbnailUrl ?? item.path)
+              : undefined,
+          },
+    )
+    .filter((item: any) => !!item.url);
 }
 
 function normalizePost(raw: any): Post {
@@ -74,7 +113,7 @@ function normalizePost(raw: any): Post {
       : null,
     commentCount: raw.commentCount ?? 0,
     likedByMe: raw.likedByMe ?? raw.isLiked ?? false,
-    media: raw.media ?? [],
+    media: normalizeMedia(raw),
   };
 }
 
@@ -114,6 +153,10 @@ export const postsApi = {
     const res = await apiClient.delete(`/api/boards/${id}/like`);
     return res.data;
   },
+
+  reportPost: async ({ postId, ...payload }: { postId: string } & ReportPayload): Promise<void> => {
+    await apiClient.post(`/api/boards/${postId}/report`, payload);
+  },
 };
 
 export const commentsApi = {
@@ -140,6 +183,14 @@ export const commentsApi = {
   unlikeComment: async ({ postId, commentId }: { postId: string; commentId: string }): Promise<LikeResult> => {
     const res = await apiClient.delete(`/api/boards/${postId}/comments/${commentId}/like`);
     return res.data;
+  },
+
+  reportComment: async ({
+    postId,
+    commentId,
+    ...payload
+  }: { postId: string; commentId: string } & ReportPayload): Promise<void> => {
+    await apiClient.post(`/api/boards/${postId}/comments/${commentId}/report`, payload);
   },
 };
 

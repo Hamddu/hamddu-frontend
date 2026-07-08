@@ -13,16 +13,18 @@ import {
   Alert,
   Share,
 } from "react-native";
-import { Text, TextInput, Button, Avatar } from "react-native-paper";
+import { Text, TextInput, Button, Avatar, Dialog, Portal, RadioButton } from "react-native-paper";
 import RenderHtml from "react-native-render-html";
 import { useRoute } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import axios from "axios";
 import { usePost, useToggleLike } from "../hooks/usePosts";
 import { useComments, useAddComment, useDeleteComment, useToggleCommentLike } from "../hooks/useComments";
 import { CommunityStackParamList } from "../types/navigation";
 import CommentItem from "../components/CommentItem";
 import { getMyProfile } from "../api/users.api";
+import { commentsApi, postsApi, ReportReason } from "../services/api";
 
 const PRIMARY = "#FF7325";
 const PRIMARY_SOFT = "#FFE6D6";
@@ -34,6 +36,15 @@ const LINE = "#ECECEC";
 const WHITE = "#FFFFFF";
 
 type PostDetailRouteProp = RouteProp<CommunityStackParamList, "PostDetail">;
+type ReportTarget = { type: "post"; id: string } | { type: "comment"; id: string };
+
+const REPORT_REASONS: { label: string; value: ReportReason }[] = [
+  { label: "스팸/광고", value: "spam" },
+  { label: "욕설/비방", value: "harassment" },
+  { label: "부적절한 콘텐츠", value: "inappropriate" },
+  { label: "저작권 침해", value: "copyright" },
+  { label: "기타", value: "other" },
+];
 
 function getTimeAgo(dateStr: string): string {
   const diffMs = Date.now() - new Date(dateStr).getTime();
@@ -52,6 +63,11 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
 }
 
+function getApiErrorMessage(error: unknown): string {
+  if (!axios.isAxiosError(error)) return "신고 접수에 실패했습니다.";
+  return error.response?.data?.errorMessage ?? error.response?.data?.message ?? "신고 접수에 실패했습니다.";
+}
+
 export default function PostDetailScreen() {
   const route = useRoute<PostDetailRouteProp>();
   const { postId } = route.params;
@@ -67,6 +83,25 @@ export default function PostDetailScreen() {
   const { width: contentWidth } = useWindowDimensions();
   const [commentText, setCommentText] = useState("");
   const [replyTo, setReplyTo] = useState<{ id: string; nickname: string } | null>(null);
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
+  const [reportReason, setReportReason] = useState<ReportReason>("spam");
+  const [reportDescription, setReportDescription] = useState("");
+
+  const reportMutation = useMutation({
+    mutationFn: ({ target, reason, description }: { target: ReportTarget; reason: ReportReason; description?: string }) =>
+      target.type === "post"
+        ? postsApi.reportPost({ postId: target.id, reason, description })
+        : commentsApi.reportComment({ postId, commentId: target.id, reason, description }),
+    onSuccess: () => {
+      setReportTarget(null);
+      setReportReason("spam");
+      setReportDescription("");
+      Alert.alert("신고 완료", "신고가 접수되었습니다.");
+    },
+    onError: (error) => {
+      Alert.alert("신고 실패", getApiErrorMessage(error));
+    },
+  });
 
   const handleLikePress = () => {
     if (post) toggleLike(post);
@@ -100,6 +135,22 @@ export default function PostDetailScreen() {
     await Share.share({
       title: post?.title ?? "함뜨 게시글",
       message: `${post?.title ?? "함뜨 게시글"}\n${stripHtml(post?.body ?? "")}`,
+    });
+  };
+
+  const openReportDialog = (target: ReportTarget) => {
+    setReportTarget(target);
+    setReportReason("spam");
+    setReportDescription("");
+  };
+
+  const submitReport = () => {
+    if (!reportTarget) return;
+    const description = reportDescription.trim();
+    reportMutation.mutate({
+      target: reportTarget,
+      reason: reportReason,
+      description: description || undefined,
     });
   };
 
@@ -157,6 +208,9 @@ export default function PostDetailScreen() {
               <Text style={styles.authorMeta}>{getTimeAgo(post.createdAt)} · 조회 {(post as any).viewCount ?? 132}</Text>
             </View>
           </View>
+          <TouchableOpacity style={styles.headerReportBtn} onPress={() => openReportDialog({ type: "post", id: post.id })}>
+            <Text style={styles.headerReportText}>신고</Text>
+          </TouchableOpacity>
         </View>
 
         {/* 게시글 본문 영역 */}
@@ -214,6 +268,10 @@ export default function PostDetailScreen() {
             <Text style={styles.actionIcon}>⋮</Text>
             <Text style={styles.actionLabel}>공유</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={styles.actionBtn} onPress={() => openReportDialog({ type: "post", id: post.id })}>
+            <Text style={styles.actionIcon}>!</Text>
+            <Text style={styles.actionLabel}>신고</Text>
+          </TouchableOpacity>
         </View>
 
         {/* 댓글 섹션 */}
@@ -239,6 +297,7 @@ export default function PostDetailScreen() {
                       nickname: comment.author?.nickname ?? "익명",
                     })
                   }
+                  onReport={(comment) => openReportDialog({ type: "comment", id: comment.id })}
                 />
               )}
               keyExtractor={(item) => item.id}
@@ -288,6 +347,47 @@ export default function PostDetailScreen() {
           </Button>
         </View>
       </View>
+
+      <Portal>
+        <Dialog visible={!!reportTarget} onDismiss={() => setReportTarget(null)}>
+          <Dialog.Title>{reportTarget?.type === "post" ? "게시글 신고" : "댓글 신고"}</Dialog.Title>
+          <Dialog.Content>
+            <RadioButton.Group
+              onValueChange={(value) => setReportReason(value as ReportReason)}
+              value={reportReason}
+            >
+              {REPORT_REASONS.map((reason) => (
+                <RadioButton.Item
+                  key={reason.value}
+                  label={reason.label}
+                  value={reason.value}
+                  color={PRIMARY}
+                  labelStyle={styles.reportReasonLabel}
+                />
+              ))}
+            </RadioButton.Group>
+            <TextInput
+              value={reportDescription}
+              onChangeText={setReportDescription}
+              placeholder="상세 내용을 입력해주세요. (선택)"
+              mode="outlined"
+              multiline
+              maxLength={1000}
+              style={styles.reportDescription}
+              outlineColor={LINE}
+              activeOutlineColor={PRIMARY}
+            />
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setReportTarget(null)} disabled={reportMutation.isPending}>
+              취소
+            </Button>
+            <Button onPress={submitReport} loading={reportMutation.isPending} disabled={reportMutation.isPending}>
+              신고
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </KeyboardAvoidingView>
   );
 }
@@ -333,6 +433,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     flex: 1,
+  },
+  headerReportBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  headerReportText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: INK3,
   },
   avatar: {
     backgroundColor: PRIMARY_SOFT,
@@ -501,5 +610,15 @@ const styles = StyleSheet.create({
   submitLabel: {
     fontSize: 13,
     fontWeight: "700",
+  },
+  reportReasonLabel: {
+    fontSize: 14,
+    color: INK2,
+  },
+  reportDescription: {
+    maxHeight: 120,
+    marginTop: 8,
+    backgroundColor: WHITE,
+    fontSize: 13,
   },
 });

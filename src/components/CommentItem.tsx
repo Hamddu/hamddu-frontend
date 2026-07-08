@@ -16,6 +16,7 @@ interface CommentItemProps {
   onDelete?: (commentId: string) => void;
   onLike?: (comment: Comment) => void;
   onReply?: (comment: Comment) => void;
+  onReport?: (comment: Comment) => void;
   depth?: number;
 }
 
@@ -38,6 +39,7 @@ export default function CommentItem({
   onDelete,
   onLike,
   onReply,
+  onReport,
   depth = 0,
 }: CommentItemProps) {
   const authorName = comment.author?.nickname ?? "익명";
@@ -81,6 +83,9 @@ export default function CommentItem({
           <TouchableOpacity onPress={() => onReply?.(comment)}>
             <Text style={styles.replyText}>답글 달기</Text>
           </TouchableOpacity>
+          <TouchableOpacity onPress={() => onReport?.(comment)}>
+            <Text style={styles.reportText}>신고</Text>
+          </TouchableOpacity>
         </View>
 
         {hasReplies && (
@@ -103,6 +108,7 @@ export default function CommentItem({
             onDelete={onDelete}
             onLike={onLike}
             onReply={onReply}
+            onReport={onReport}
             depth={depth + 1}
           />
         ))}
@@ -194,6 +200,11 @@ const styles = StyleSheet.create({
     color: INK3,
   },
   replyText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: INK3,
+  },
+  reportText: {
     fontSize: 11,
     fontWeight: "600",
     color: INK3,

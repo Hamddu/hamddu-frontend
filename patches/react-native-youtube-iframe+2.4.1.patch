@@ -1,0 +1,72 @@
+diff --git a/node_modules/react-native-youtube-iframe/lib/commonjs/PlayerScripts.js b/node_modules/react-native-youtube-iframe/lib/commonjs/PlayerScripts.js
+index 7867fe7..24be41a 100644
+--- a/node_modules/react-native-youtube-iframe/lib/commonjs/PlayerScripts.js
++++ b/node_modules/react-native-youtube-iframe/lib/commonjs/PlayerScripts.js
+@@ -256,6 +256,10 @@ const MAIN_SCRIPT = (videoId, playList, initialPlayerParams, allowWebViewZoom, c
+             case 'unMuteVideo':
+               player.unMute();
+               break;
++
++            case 'setPlaybackRate':
++              player.setPlaybackRate(parsedData.meta.playbackRate);
++              break;
+           }
+         } catch (error) {
+           console.error('Error parsing data', event, error);
+diff --git a/node_modules/react-native-youtube-iframe/lib/commonjs/YoutubeIframe.js b/node_modules/react-native-youtube-iframe/lib/commonjs/YoutubeIframe.js
+index 0be2dad..c65fa35 100644
+--- a/node_modules/react-native-youtube-iframe/lib/commonjs/YoutubeIframe.js
++++ b/node_modules/react-native-youtube-iframe/lib/commonjs/YoutubeIframe.js
+@@ -101,6 +101,15 @@ const YoutubeIframe = (props, ref) => {
+     },
+     seekTo: (seconds, allowSeekAhead) => {
+       webViewRef.current.injectJavaScript(_PlayerScripts.PLAYER_FUNCTIONS.seekToScript(seconds, allowSeekAhead));
++    },
++    playVideo: () => {
++      webViewRef.current.injectJavaScript(_PlayerScripts.PLAYER_FUNCTIONS.playVideo);
++    },
++    pauseVideo: () => {
++      webViewRef.current.injectJavaScript(_PlayerScripts.PLAYER_FUNCTIONS.pauseVideo);
++    },
++    setPlaybackRate: playbackRate => {
++      webViewRef.current.injectJavaScript(_PlayerScripts.PLAYER_FUNCTIONS.setPlaybackRate(playbackRate));
+     }
+   }), []);
+   (0, _react.useEffect)(() => {
+diff --git a/node_modules/react-native-youtube-iframe/src/PlayerScripts.js b/node_modules/react-native-youtube-iframe/src/PlayerScripts.js
+index 547b51f..ffee480 100644
+--- a/node_modules/react-native-youtube-iframe/src/PlayerScripts.js
++++ b/node_modules/react-native-youtube-iframe/src/PlayerScripts.js
+@@ -276,6 +276,10 @@ export const MAIN_SCRIPT = (
+             case 'unMuteVideo':
+               player.unMute();
+               break;
++
++            case 'setPlaybackRate':
++              player.setPlaybackRate(parsedData.meta.playbackRate);
++              break;
+           }
+         } catch (error) {
+           console.error('Error parsing data', event, error);
+diff --git a/node_modules/react-native-youtube-iframe/src/YoutubeIframe.js b/node_modules/react-native-youtube-iframe/src/YoutubeIframe.js
+index 4bbf487..1a36e9f 100644
+--- a/node_modules/react-native-youtube-iframe/src/YoutubeIframe.js
++++ b/node_modules/react-native-youtube-iframe/src/YoutubeIframe.js
+@@ -121,6 +121,17 @@ const YoutubeIframe = (props, ref) => {
+           PLAYER_FUNCTIONS.seekToScript(seconds, allowSeekAhead),
+         );
+       },
++      playVideo: () => {
++        webViewRef.current.injectJavaScript(PLAYER_FUNCTIONS.playVideo);
++      },
++      pauseVideo: () => {
++        webViewRef.current.injectJavaScript(PLAYER_FUNCTIONS.pauseVideo);
++      },
++      setPlaybackRate: playbackRate => {
++        webViewRef.current.injectJavaScript(
++          PLAYER_FUNCTIONS.setPlaybackRate(playbackRate),
++        );
++      },
+     }),
+     [],
+   );

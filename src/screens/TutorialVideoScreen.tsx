@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  GestureResponderEvent,
   Platform,
   ScrollView,
   useWindowDimensions,
@@ -36,31 +37,119 @@ const SPEEDS = [
   { label: "1.5x", value: 1.5 },
 ];
 
+function timestampToSeconds(timestamp?: string): number {
+  const parts = timestamp?.split(":").map(Number);
+  if (!parts || parts.length !== 3 || parts.some(Number.isNaN)) return 0;
+  return parts[0] * 3600 + parts[1] * 60 + parts[2];
+}
+
+function secondsToTimestamp(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds));
+  const hh = String(Math.floor(total / 3600)).padStart(2, "0");
+  const mm = String(Math.floor((total % 3600) / 60)).padStart(2, "0");
+  const ss = String(total % 60).padStart(2, "0");
+  return `${hh}:${mm}:${ss}`;
+}
+
+function formatDuration(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds));
+  const hh = Math.floor(total / 3600);
+  const mm = Math.floor((total % 3600) / 60);
+  const ss = total % 60;
+  if (hh > 0) {
+    return `${hh}:${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
+  }
+  return `${mm}:${String(ss).padStart(2, "0")}`;
+}
+
 export default function TutorialVideoScreen() {
   const navigation = useNavigation();
   const route = useRoute<RouteType>();
-  const { videoId, title, contentId } = route.params;
+  const { videoId, title, contentId, lastWatchedTimestamp } = route.params;
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [speed, setSpeed] = useState(1);
   const [watchRate, setWatchRate] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(timestampToSeconds(lastWatchedTimestamp));
+  const [totalDuration, setTotalDuration] = useState(0);
+  const [progressTrackWidth, setProgressTrackWidth] = useState(1);
   const totalDurationRef = useRef(0);
   const watchRateRef = useRef(0);
+  const currentTimeRef = useRef(timestampToSeconds(lastWatchedTimestamp));
+  const lastSavedAtRef = useRef(0);
+  const leavingRef = useRef(false);
   const playerRef = useRef<any>(null);
   const queryClient = useQueryClient();
+
+  const saveHistory = useMutation({
+    mutationFn: watchHistoryApi.save,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["watch-history"] });
+    },
+  });
+
+  const saveCurrentProgress = async (forceComplete = false) => {
+    if (!playerRef.current && !forceComplete) return;
+
+    let currentTime = currentTimeRef.current;
+    let totalDuration = totalDurationRef.current;
+    if (playerRef.current) {
+      const latestDuration: number | null = await playerRef.current.getDuration().catch(() => null);
+      if (latestDuration !== null) totalDuration = latestDuration;
+      const latestTime: number | null = await playerRef.current.getCurrentTime().catch(() => null);
+      if (latestTime !== null) currentTime = latestTime;
+    }
+
+    currentTimeRef.current = currentTime;
+    setCurrentTime(currentTime);
+    totalDuration = Math.max(1, Math.floor(totalDuration || currentTime || 60));
+    totalDurationRef.current = totalDuration;
+    setTotalDuration(totalDuration);
+    const completed = forceComplete || watchRateRef.current >= 100;
+    const watchRate = completed
+      ? 100
+      : Math.min(Math.round((currentTime / totalDuration) * 100), 100);
+    watchRateRef.current = watchRate;
+    setWatchRate(watchRate);
+
+    await saveHistory.mutateAsync({
+      contentId,
+      totalDuration,
+      lastWatchedTimestamp: secondsToTimestamp(completed ? totalDuration : currentTime),
+      watchRate,
+    });
+  };
 
   useEffect(() => {
     if (!isPlaying) return;
     const interval = setInterval(async () => {
       if (!playerRef.current || !totalDurationRef.current) return;
       const currentTime: number = await playerRef.current.getCurrentTime();
+      currentTimeRef.current = currentTime;
+      setCurrentTime(currentTime);
       const pct = Math.min(Math.round((currentTime / totalDurationRef.current) * 100), 100);
       watchRateRef.current = pct;
       setWatchRate(pct);
+      if (Date.now() - lastSavedAtRef.current > 15000) {
+        lastSavedAtRef.current = Date.now();
+        saveCurrentProgress().catch(() => {});
+      }
     }, 3000);
     return () => clearInterval(interval);
   }, [isPlaying]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("beforeRemove", (e: any) => {
+      if (leavingRef.current) return;
+      e.preventDefault();
+      leavingRef.current = true;
+      saveCurrentProgress()
+        .catch(() => {})
+        .finally(() => navigation.dispatch(e.data.action));
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const [showChallengeModal, setShowChallengeModal] = useState(false);
   const [comment, setComment] = useState("");
@@ -70,13 +159,6 @@ export default function TutorialVideoScreen() {
   const videoHeight = width * (9 / 16);
   const [showScreenshotWarn, setShowScreenshotWarn] = useState(false);
   useScreenshotProtection(() => setShowScreenshotWarn(true));
-
-  const saveHistory = useMutation({
-    mutationFn: watchHistoryApi.save,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["watch-history"] });
-    },
-  });
 
   const submitChallenge = useMutation({
     mutationFn: challengesApi.submit,
@@ -104,27 +186,51 @@ export default function TutorialVideoScreen() {
   });
 
   const handleDone = async () => {
-    let rate = watchRateRef.current;
-
-    // 완료 시점의 최신 위치를 한 번 더 가져옴 (실패하면 폴링값 유지)
-    if (playerRef.current && totalDurationRef.current) {
-      const currentTime: number | null = await playerRef.current.getCurrentTime().catch(() => null);
-      if (currentTime !== null) {
-        rate = Math.min(Math.round((currentTime / totalDurationRef.current) * 100), 100);
-      }
-    }
-
-    const totalSec = totalDurationRef.current || 60;
-    const hh = String(Math.floor(totalSec / 3600)).padStart(2, "0");
-    const mm = String(Math.floor((totalSec % 3600) / 60)).padStart(2, "0");
-    const ss = String(totalSec % 60).padStart(2, "0");
-    saveHistory.mutate({
-      contentId,
-      totalDuration: totalSec,
-      lastWatchedTimestamp: `${hh}:${mm}:${ss}`,
-      watchRate: rate,
-    });
+    await saveCurrentProgress(true).catch(() => {});
     setShowChallengeModal(true);
+  };
+
+  const playVideo = () => {
+    playerRef.current?.playVideo?.();
+    setIsPlaying(true);
+  };
+
+  const pauseVideo = () => {
+    playerRef.current?.pauseVideo?.();
+    setIsPlaying(false);
+    saveCurrentProgress().catch(() => {});
+  };
+
+  const togglePlayback = () => {
+    if (isPlaying) {
+      pauseVideo();
+    } else {
+      playVideo();
+    }
+  };
+
+  const changeSpeed = (nextSpeed: number) => {
+    setSpeed(nextSpeed);
+    playerRef.current?.setPlaybackRate?.(nextSpeed);
+  };
+
+  const seekBy = (delta: number) => {
+    const total = totalDurationRef.current || totalDuration || 0;
+    const nextTime = Math.max(0, Math.min((currentTimeRef.current || 0) + delta, total || Infinity));
+    currentTimeRef.current = nextTime;
+    setCurrentTime(nextTime);
+    playerRef.current?.seekTo(nextTime, true);
+  };
+
+  const handleSeekBarPress = (event: GestureResponderEvent) => {
+    const total = totalDurationRef.current || totalDuration;
+    if (!total) return;
+    const ratio = Math.max(0, Math.min(event.nativeEvent.locationX / progressTrackWidth, 1));
+    const nextTime = total * ratio;
+    currentTimeRef.current = nextTime;
+    setCurrentTime(nextTime);
+    playerRef.current?.seekTo(nextTime, true);
+    saveCurrentProgress().catch(() => {});
   };
 
   const handlePickImage = () => {
@@ -137,7 +243,9 @@ export default function TutorialVideoScreen() {
           setImageUploading(false);
           if (result.ok) {
             setCertImage({ url: result.url, mediaId: result.mediaId });
-          } else if (result.error !== "cancelled") {
+            return;
+          }
+          if ("error" in result && result.error !== "cancelled") {
             Alert.alert("사진 업로드 실패", result.error);
           }
         },
@@ -150,7 +258,9 @@ export default function TutorialVideoScreen() {
           setImageUploading(false);
           if (result.ok) {
             setCertImage({ url: result.url, mediaId: result.mediaId });
-          } else if (result.error !== "cancelled") {
+            return;
+          }
+          if ("error" in result && result.error !== "cancelled") {
             Alert.alert("사진 업로드 실패", result.error);
           }
         },
@@ -173,38 +283,67 @@ export default function TutorialVideoScreen() {
     navigation.goBack();
   };
 
+  const progressPct = totalDuration ? Math.min((currentTime / totalDuration) * 100, 100) : watchRate;
+
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
 
       {/* 영상 영역 */}
-      <View style={[styles.playerContainer, { paddingTop: insets.top, height: videoHeight + insets.top }]}>
+      <View style={[styles.playerContainer, { paddingTop: insets.top }]}>
         {YoutubePlayer ? (
           <YoutubePlayer
               ref={playerRef}
               height={videoHeight}
               width={width}
               videoId={videoId}
+              play={isPlaying}
               playbackRate={speed}
+              initialPlayerParams={{ controls: false, rel: false, preventFullScreen: true }}
+              onPlaybackRateChange={(nextSpeed: number) => setSpeed(nextSpeed)}
               onChangeState={(state: string) => {
                 if (state === "playing") setIsPlaying(true);
-                if (state === "paused") setIsPlaying(false);
+                if (state === "paused") {
+                  setIsPlaying(false);
+                  saveCurrentProgress().catch(() => {});
+                }
                 if (state === "ended") {
                   setIsPlaying(false);
                   watchRateRef.current = 100;
                   setWatchRate(100);
+                  saveCurrentProgress(true).catch(() => {});
                 }
               }}
-              onReady={(e: any) => {
-                e.target?.getDuration?.().then((d: number) => {
-                  totalDurationRef.current = d;
+              onReady={() => {
+                playerRef.current?.getDuration?.().then((d: number) => {
+                  const duration = Math.max(1, Math.floor(d));
+                  totalDurationRef.current = duration;
+                  setTotalDuration(duration);
                 });
+                const startAt = timestampToSeconds(lastWatchedTimestamp);
+                if (startAt > 0) {
+                  currentTimeRef.current = startAt;
+                  setCurrentTime(startAt);
+                  playerRef.current?.seekTo(startAt, true);
+                }
               }}
             />
         ) : (
           <View style={[styles.webPlaceholder, { height: videoHeight }]}>
             <Text style={styles.webPlaceholderText}>모바일에서 확인하세요</Text>
           </View>
+        )}
+
+        {!isPlaying && (
+          <TouchableOpacity
+            style={[styles.pauseOverlay, { top: insets.top, height: videoHeight }]}
+            onPress={playVideo}
+            activeOpacity={0.85}
+          >
+            <View style={styles.centerPlayBtn}>
+              <Text style={styles.centerPlayIcon}>▶</Text>
+            </View>
+          </TouchableOpacity>
         )}
 
         <TouchableOpacity
@@ -215,6 +354,47 @@ export default function TutorialVideoScreen() {
         >
           <Text style={styles.backIcon}>‹</Text>
         </TouchableOpacity>
+
+        <View style={styles.playerChrome}>
+          <TouchableOpacity
+            style={styles.seekBtn}
+            onPress={() => seekBy(-10)}
+            activeOpacity={0.75}
+          >
+            <Text style={styles.seekText}>-10</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.controlPlayBtn}
+            onPress={togglePlayback}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.controlPlayText}>{isPlaying ? "Ⅱ" : "▶"}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.seekBtn}
+            onPress={() => seekBy(10)}
+            activeOpacity={0.75}
+          >
+            <Text style={styles.seekText}>+10</Text>
+          </TouchableOpacity>
+          <View style={styles.timeColumn}>
+            <TouchableOpacity
+              style={styles.progressTrack}
+              onPress={handleSeekBarPress}
+              onLayout={(event) => setProgressTrackWidth(Math.max(1, event.nativeEvent.layout.width))}
+              activeOpacity={0.9}
+            >
+              <View style={[styles.progressFill, { width: `${progressPct}%` as any }]} />
+            </TouchableOpacity>
+            <View style={styles.timeRow}>
+              <Text style={styles.timeText}>{formatDuration(currentTime)}</Text>
+              <Text style={styles.timeText}>{formatDuration(totalDuration)}</Text>
+            </View>
+          </View>
+          <View style={styles.speedPill}>
+            <Text style={styles.speedPillText}>{speed}x</Text>
+          </View>
+        </View>
       </View>
 
       {/* 콘텐츠 영역 */}
@@ -237,7 +417,7 @@ export default function TutorialVideoScreen() {
               <TouchableOpacity
                 key={s.label}
                 style={[styles.speedBtn, speed === s.value && styles.speedBtnActive]}
-                onPress={() => setSpeed(s.value)}
+                onPress={() => changeSpeed(s.value)}
                 activeOpacity={0.75}
               >
                 <Text style={[styles.speedText, speed === s.value && styles.speedTextActive]}>
@@ -373,7 +553,6 @@ const styles = StyleSheet.create({
   playerContainer: {
     backgroundColor: "#000",
     width: "100%",
-    justifyContent: "flex-end",
   },
   thumbContainer: {
     width: "100%",
@@ -385,23 +564,102 @@ const styles = StyleSheet.create({
     position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: "rgba(0,0,0,0.3)",
   },
-  customPlayBtn: {
+  pauseOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.62)",
+  },
+  centerPlayBtn: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: PRIMARY,
+    backgroundColor: "rgba(255,115,37,0.94)",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
   },
-  customPlayIcon: {
+  centerPlayIcon: {
     fontSize: 24,
     color: "#fff",
     marginLeft: 4,
+  },
+  playerChrome: {
+    minHeight: 78,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 12,
+    backgroundColor: "rgba(0,0,0,0.72)",
+  },
+  controlPlayBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: PRIMARY,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  controlPlayText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "900",
+    marginLeft: 1,
+  },
+  seekBtn: {
+    width: 36,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  seekText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  timeColumn: {
+    flex: 1,
+    minWidth: 0,
+  },
+  progressTrack: {
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.28)",
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 3,
+    backgroundColor: PRIMARY,
+  },
+  timeRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 6,
+  },
+  timeText: {
+    color: "rgba(255,255,255,0.82)",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  speedPill: {
+    minWidth: 42,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
+  speedPillText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "800",
   },
   webPlaceholder: {
     backgroundColor: "#2A2A2A",

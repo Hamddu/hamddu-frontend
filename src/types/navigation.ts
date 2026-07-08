@@ -7,7 +7,13 @@ export type RootTabParamList = {
 
 export type HomeStackParamList = {
   TutorialList: undefined;
-  TutorialVideo: { videoId: string; title: string; lessonIndex: number; contentId: string };
+  TutorialVideo: {
+    videoId: string;
+    title: string;
+    lessonIndex: number;
+    contentId: string;
+    lastWatchedTimestamp?: string;
+  };
 };
 
 export type CommunityStackParamList = {

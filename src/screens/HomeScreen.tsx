@@ -42,7 +42,7 @@ function getLessonState(history: WatchHistory | undefined): {
   pct?: number;
 } {
   if (!history) return { state: "open" };
-  if (history.watchRate >= 90) return { state: "done" };
+  if (history.watchRate >= 100) return { state: "done" };
   return { state: "progress", pct: history.watchRate };
 }
 
@@ -276,6 +276,8 @@ export default function HomeScreen() {
                   title: item.title,
                   lessonIndex: index,
                   contentId: item.contentId,
+                  lastWatchedTimestamp:
+                    item.state === "progress" ? historyMap[item.contentId]?.lastWatchedTimestamp : undefined,
                 });
               }
             }}

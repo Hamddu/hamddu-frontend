@@ -55,6 +55,7 @@ function PostListItem({
   const avatarText = (post.author?.nickname ?? "??").slice(0, 2);
   const catName = getCategoryLabel(post.category?.name ?? "");
   const thumbUrl = post.media?.[0]?.url;
+  const mediaCount = post.media?.length ?? 0;
 
   return (
     <TouchableOpacity
@@ -105,13 +106,20 @@ function PostListItem({
             </View>
           </View>
         </View>
-        {thumbUrl && (
-          <Image
-            source={{ uri: thumbUrl }}
-            style={styles.postThumb}
-            resizeMode="cover"
-          />
-        )}
+        {thumbUrl ? (
+          <View style={styles.postThumbWrap}>
+            <Image
+              source={{ uri: thumbUrl }}
+              style={styles.postThumb}
+              resizeMode="cover"
+            />
+            {mediaCount > 1 && (
+              <View style={styles.postThumbBadge}>
+                <Text style={styles.postThumbBadgeText}>+{mediaCount - 1}</Text>
+              </View>
+            )}
+          </View>
+        ) : null}
       </View>
     </TouchableOpacity>
   );
@@ -363,9 +371,11 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 10,
     flexDirection: "row",
+    alignItems: "center",
   },
   postBodyContent: {
     flex: 1,
+    minWidth: 0,
   },
   postAuthorRow: {
     flexDirection: "row",
@@ -402,13 +412,35 @@ const styles = StyleSheet.create({
   postAction: { flexDirection: "row", alignItems: "center", gap: 4 },
   postActionIcon: { fontSize: 13, color: INK3 },
   postActionText: { fontSize: 12, color: INK3, fontWeight: "600" },
-  postThumb: {
-    width: 72,
-    height: 72,
-    borderRadius: 8,
+  postThumbWrap: {
+    width: 76,
+    height: 76,
+    borderRadius: 10,
     backgroundColor: "#F2F2F2",
-    marginLeft: 10,
+    marginLeft: 12,
     alignSelf: "center",
+    overflow: "hidden",
+  },
+  postThumb: {
+    width: "100%",
+    height: "100%",
+  },
+  postThumbBadge: {
+    position: "absolute",
+    right: 5,
+    bottom: 5,
+    minWidth: 24,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "rgba(0,0,0,0.58)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+  },
+  postThumbBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#fff",
   },
   fab: {
     position: "absolute",
