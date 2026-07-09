@@ -1,11 +1,20 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
+import { Animated } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Provider as PaperProvider } from "react-native-paper";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import type { SvgProps } from "react-native-svg";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
+import HomeActiveIcon from "./assets/tab-icons/home_active.svg";
+import HomeDisabledIcon from "./assets/tab-icons/home_disabled.svg";
+import CounterActiveIcon from "./assets/tab-icons/counter_active.svg";
+import CounterDisabledIcon from "./assets/tab-icons/counter_disabled.svg";
+import CommunityActiveIcon from "./assets/tab-icons/community.svg";
+import CommunityDisabledIcon from "./assets/tab-icons/community_disabled.svg";
+import MyActiveIcon from "./assets/tab-icons/my_active.svg";
+import MyDisabledIcon from "./assets/tab-icons/my_disabled.svg";
 import HomeScreen from "./src/screens/HomeScreen";
 import TutorialVideoScreen from "./src/screens/TutorialVideoScreen";
 import CounterScreen from "./src/screens/CounterScreen";
@@ -28,6 +37,51 @@ const RootStack = createNativeStackNavigator();
 
 const PRIMARY = "#FF7325";
 const INK3 = "#8A8A8A";
+
+function TabIcon({
+  focused,
+  ActiveIcon,
+  DisabledIcon,
+}: {
+  focused: boolean;
+  ActiveIcon: React.ComponentType<SvgProps>;
+  DisabledIcon: React.ComponentType<SvgProps>;
+}) {
+  const progress = useRef(new Animated.Value(focused ? 1 : 0)).current;
+  const Icon = focused ? ActiveIcon : DisabledIcon;
+
+  useEffect(() => {
+    Animated.spring(progress, {
+      toValue: focused ? 1 : 0,
+      useNativeDriver: true,
+      speed: 18,
+      bounciness: 6,
+    }).start();
+  }, [focused, progress]);
+
+  return (
+    <Animated.View
+      style={{
+        transform: [
+          {
+            translateY: progress.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, -2],
+            }),
+          },
+          {
+            scale: progress.interpolate({
+              inputRange: [0, 1],
+              outputRange: [1, 1.08],
+            }),
+          },
+        ],
+      }}
+    >
+      <Icon width={32} height={32} />
+    </Animated.View>
+  );
+}
 
 function HomeStackNavigator() {
   return (
@@ -99,8 +153,12 @@ function MainTabs() {
         component={HomeStackNavigator}
         options={{
           tabBarLabel: "홈",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="home" color={color} size={size} />
+          tabBarIcon: ({ focused }) => (
+            <TabIcon
+              focused={focused}
+              ActiveIcon={HomeActiveIcon}
+              DisabledIcon={HomeDisabledIcon}
+            />
           ),
         }}
       />
@@ -110,8 +168,12 @@ function MainTabs() {
         options={{
           tabBarLabel: "코카운터",
           headerShown: false,
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="counter" color={color} size={size} />
+          tabBarIcon: ({ focused }) => (
+            <TabIcon
+              focused={focused}
+              ActiveIcon={CounterActiveIcon}
+              DisabledIcon={CounterDisabledIcon}
+            />
           ),
         }}
       />
@@ -120,8 +182,12 @@ function MainTabs() {
         component={CommunityStackNavigator}
         options={{
           tabBarLabel: "커뮤니티",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="forum" color={color} size={size} />
+          tabBarIcon: ({ focused }) => (
+            <TabIcon
+              focused={focused}
+              ActiveIcon={CommunityActiveIcon}
+              DisabledIcon={CommunityDisabledIcon}
+            />
           ),
         }}
       />
@@ -131,8 +197,12 @@ function MainTabs() {
         options={{
           tabBarLabel: "마이",
           headerShown: false,
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="account" color={color} size={size} />
+          tabBarIcon: ({ focused }) => (
+            <TabIcon
+              focused={focused}
+              ActiveIcon={MyActiveIcon}
+              DisabledIcon={MyDisabledIcon}
+            />
           ),
         }}
       />

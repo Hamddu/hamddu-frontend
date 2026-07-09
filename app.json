@@ -18,8 +18,7 @@
       "adaptiveIcon": {
         "backgroundColor": "#FF7325"
       },
-      "package": "com.hamddu.app",
-      "permissions": ["android.permission.RECORD_AUDIO"]
+      "package": "com.hamddu.app"
     },
     "web": {
       "bundler": "metro"

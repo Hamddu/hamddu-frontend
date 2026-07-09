@@ -100,7 +100,6 @@ export async function pickAndUploadImage(
     });
 
     const rawBody = await res.text();
-    console.log(`[upload] status=${res.status} body=`, rawBody);
 
     if (!res.ok) {
       let parsed: any = {};
