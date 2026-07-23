@@ -36,6 +36,7 @@ const SPEEDS = [
   { label: "1x", value: 1 },
   { label: "1.5x", value: 1.5 },
 ];
+const MIN_WATCH_SECONDS_TO_COMPLETE = 30;
 
 function timestampToSeconds(timestamp?: string): number {
   const parts = timestamp?.split(":").map(Number);
@@ -65,7 +66,14 @@ function formatDuration(seconds: number): string {
 export default function TutorialVideoScreen() {
   const navigation = useNavigation();
   const route = useRoute<RouteType>();
-  const { videoId, title, contentId, lastWatchedTimestamp } = route.params;
+  const {
+    videoId,
+    title,
+    contentId,
+    lastWatchedTimestamp,
+    alreadyWatched,
+    alreadyCertified,
+  } = route.params;
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [speed, setSpeed] = useState(1);
@@ -80,6 +88,7 @@ export default function TutorialVideoScreen() {
   const lastSavedAtRef = useRef(0);
   const leavingRef = useRef(false);
   const playerRef = useRef<any>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queryClient = useQueryClient();
 
   const saveHistory = useMutation({
@@ -151,10 +160,17 @@ export default function TutorialVideoScreen() {
     return unsubscribe;
   }, [navigation]);
 
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
   const [showChallengeModal, setShowChallengeModal] = useState(false);
   const [comment, setComment] = useState("");
   const [certImage, setCertImage] = useState<{ url: string; mediaId: string } | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
 
   const videoHeight = width * (9 / 16);
   const [showScreenshotWarn, setShowScreenshotWarn] = useState(false);
@@ -186,6 +202,19 @@ export default function TutorialVideoScreen() {
   });
 
   const handleDone = async () => {
+    const latestTime: number | null =
+      (await playerRef.current?.getCurrentTime?.().catch(() => null)) ?? null;
+    if (latestTime !== null) {
+      currentTimeRef.current = latestTime;
+      setCurrentTime(latestTime);
+    }
+
+    if (!alreadyWatched && currentTimeRef.current < MIN_WATCH_SECONDS_TO_COMPLETE) {
+      setToastMessage("영상을 조금만 더 시청해주세요~");
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = setTimeout(() => setToastMessage(""), 2000);
+      return;
+    }
     await saveCurrentProgress(true).catch(() => {});
     setShowChallengeModal(true);
   };
@@ -428,22 +457,26 @@ export default function TutorialVideoScreen() {
           </View>
         </View>
 
-        <View style={styles.certBanner}>
-          <Text style={styles.certMascot}>🐹</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.certText}>
-              영상 완료 후 인증 사진을 올리면 포인트를 받아요!
-            </Text>
+        {!alreadyCertified && (
+          <View style={styles.certBanner}>
+            <Text style={styles.certMascot}>🐹</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.certText}>
+                영상 완료 후 인증 사진을 올리면 포인트를 받아요!
+              </Text>
+            </View>
           </View>
-        </View>
+        )}
 
-        <TouchableOpacity
-          style={styles.doneBtn}
-          onPress={handleDone}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.doneBtnText}>완료하기</Text>
-        </TouchableOpacity>
+        {!alreadyCertified && (
+          <TouchableOpacity
+            style={styles.doneBtn}
+            onPress={handleDone}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.doneBtnText}>완료하기</Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
 
       {/* 인증 제출 모달 */}
@@ -536,6 +569,15 @@ export default function TutorialVideoScreen() {
           </View>
         </View>
       </Modal>
+
+      {!!toastMessage && (
+        <View
+          pointerEvents="none"
+          style={[styles.toast, { bottom: insets.bottom + 28 }]}
+        >
+          <Text style={styles.toastText}>{toastMessage}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -549,6 +591,20 @@ const LINE = "#ECECEC";
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#fff" },
+  toast: {
+    position: "absolute",
+    alignSelf: "center",
+    maxWidth: "86%",
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderRadius: 999,
+    backgroundColor: "rgba(26,26,26,0.92)",
+  },
+  toastText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "800",
+  },
 
   playerContainer: {
     backgroundColor: "#000",

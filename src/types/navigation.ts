@@ -13,6 +13,8 @@ export type HomeStackParamList = {
     lessonIndex: number;
     contentId: string;
     lastWatchedTimestamp?: string;
+    alreadyWatched?: boolean;
+    alreadyCertified?: boolean;
   };
 };
 

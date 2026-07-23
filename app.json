@@ -18,6 +18,7 @@
       "adaptiveIcon": {
         "backgroundColor": "#FF7325"
       },
+      "permissions": ["VIBRATE"],
       "package": "com.hamddu.app"
     },
     "web": {

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { Animated } from "react-native";
+import { Animated, Vibration } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -36,6 +36,8 @@ const SurveyStack = createNativeStackNavigator();
 const RootStack = createNativeStackNavigator();
 
 const PRIMARY = "#FF7325";
+const CREAM = "#FFF8F2";
+const CREAM_LINE = "#EFE6DF";
 const INK3 = "#8A8A8A";
 
 function TabIcon({
@@ -129,23 +131,27 @@ function MainTabs() {
         tabBarActiveTintColor: PRIMARY,
         tabBarInactiveTintColor: INK3,
         tabBarStyle: {
-          backgroundColor: "#FFFFFF",
+          backgroundColor: CREAM,
           borderTopWidth: 1,
-          borderTopColor: "#ECECEC",
+          borderTopColor: CREAM_LINE,
           elevation: 8,
           shadowColor: "#000",
           shadowOffset: { width: 0, height: -2 },
           shadowOpacity: 0.06,
           shadowRadius: 8,
-          height: 78,
+          height: 70,
           paddingTop: 8,
+          paddingBottom: 8,
         },
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: "600",
-          marginBottom: 4,
+          marginBottom: 0,
         },
         headerShown: false,
+      }}
+      screenListeners={{
+        tabPress: () => Vibration.vibrate(10),
       }}
     >
       <Tab.Screen
