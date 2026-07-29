@@ -54,6 +54,9 @@ web-build/
 # VSCode
 .vscode/
 
+# Codex/Claude local worktrees
+.claude/
+
 # Temporary files
 *.swp
 *.swo
