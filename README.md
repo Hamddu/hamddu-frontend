@@ -1,12 +1,12 @@
 # 뜨개질 커뮤니티 앱 🧶
 
-React Native + Expo로 만든 뜨개질 커뮤니티 테스트 프로젝트입니다.
+React Native + Expo로 만든 뜨개질 커뮤니티 앱입니다.
 
 ## 🎯 기술 스택
 
 ### 핵심
-- **React Native** (0.76.5)
-- **Expo SDK** (52 - Expo Go 54 호환 ✅)
+- **React Native** (0.83.6)
+- **Expo SDK** (55)
 - **TypeScript**
 
 ### 상태 관리
@@ -17,14 +17,16 @@ React Native + Expo로 만든 뜨개질 커뮤니티 테스트 프로젝트입�
 - **React Navigation v7** - 화면 이동 (Bottom Tabs)
 
 ### 추가 기능
-- **expo-image-picker** - 사진 선택/촬영
-- **@expo/vector-icons** - 아이콘
+- **expo-dev-client** - 실기기 개발 빌드
+- **expo-image-picker** - 사진 선택
+- **react-native-svg** - SVG 에셋/맵 UI
+- **react-native-webview** - 영상 플레이어
 
 ## 🚀 빠른 시작
 
 ### 1. 패키지 설치
 ```bash
-cd knitting-community
+cd hamddu-frontend
 
 # npm 사용
 npm install
@@ -83,36 +85,60 @@ npx expo run:ios --device
 - `login.keychain` 암호 팝업: Mac 로그인/키체인 암호를 입력하고 `항상 허용`을 누릅니다.
 - `profile has not been explicitly trusted`: iPhone `VPN 및 기기 관리`에서 개발자 앱을 신뢰합니다.
 
+## 🔔 FCM / 푸시 알림
+
+로그인 후 앱이 알림 권한을 요청하고, 기기 푸시 토큰을 `POST /api/notifications/device-tokens`로 등록합니다.
+
+### 콘솔/파일 준비
+- Firebase project: `hamddu-c5275`
+- iOS: Apple Developer에서 APNs `.p8` 키를 발급해 Firebase Console > Cloud Messaging > Apple 앱 구성에 업로드합니다.
+- iOS 설정 파일: `GoogleService-Info.plist`를 받으면 `ios/app/Supporting/`에 넣고 네이티브 빌드에 포함합니다.
+- Android 설정 파일: `google-services.json`을 받으면 Android 네이티브 폴더 생성 후 `android/app/`에 넣습니다.
+
+### 개발 메모
+- 현재 Expo 기본 토큰 등록 배선은 들어가 있습니다.
+- iOS의 Firebase FCM 토큰까지 직접 받아야 하면 `@react-native-firebase/app`, `@react-native-firebase/messaging` 추가 후 Firebase 설정 파일을 연결해야 합니다.
+- 설정 파일이 바뀐 뒤에는 `npx expo run:ios --device`로 개발 빌드를 다시 설치합니다.
+
 ## 📱 주요 기능
 
-### 1. 홈 화면 (피드)
-- 작품 목록 보기
-- 좋아요 기능
-- 댓글/공유 버튼 (UI만)
+### 1. 홈 / 기법 맵
+- 대바늘/코바늘 기법 맵
+- 영상 튜토리얼 진행 상태 표시
+- 스크롤 반응형 히어로 애니메이션
 
-### 2. 작품 등록
-- 사진 선택
-- 제목, 설명, 작성자 입력
-- Zustand로 전역 상태 관리
+### 2. 영상 튜토리얼
+- 영상 시청/이어보기
+- 30초 이상 시청 후 완료 처리
+- 인증 제출 상태 반영
 
-### 3. 프로필
-- 사용자 정보
-- 통계 (작품 수, 좋아요 수, 팔로워)
-- 내 작품 목록
-- 설정 메뉴 (UI만)
+### 3. 커뮤니티
+- 일반 게시글/인증 게시글
+- 사진 첨부 게시글 표시
+- 게시글/댓글 신고
+
+### 4. 마이 / 코카운터
+- 나의 인증 게시글 확인
+- 코카운터 로컬 저장
 
 ## 📁 프로젝트 구조
 
 ```
-knitting-community/
+hamddu-frontend/
 ├── App.tsx                    # 메인 앱, 네비게이션
 ├── src/
 │   ├── screens/
 │   │   ├── HomeScreen.tsx
+│   │   ├── TutorialVideoScreen.tsx
+│   │   ├── CommunityScreen.tsx
 │   │   ├── AddPostScreen.tsx
+│   │   ├── CounterScreen.tsx
 │   │   └── ProfileScreen.tsx
+│   ├── services/
 │   └── store/
-│       └── postStore.ts       # Zustand 스토어
+├── assets/
+│   ├── home/
+│   └── tab-icons/
 ├── package.json
 ├── tsconfig.json
 └── app.json
@@ -131,25 +157,6 @@ knitting-community/
 ### 로컬 서버가 안 보여요
 ✅ PC/Mac과 스마트폰이 같은 Wi-Fi인지 확인
 ✅ `npx expo start --tunnel` 시도
-
-## 🎨 다음 단계
-
-### 백엔드 연동
-- **Firebase** - 간단하고 빠름
-- **Supabase** - 오픈소스 Firebase 대안
-- **Node.js + Express** - 직접 구축
-
-### 추가 기능
-- 로그인/회원가입
-- 댓글 시스템
-- 검색 기능
-- 푸시 알림
-
-## 💡 참고사항
-
-- 현재는 로컬 상태(Zustand)로만 작동
-- 샘플 데이터는 앱 재시작시 초기화
-- 실제 이미지 업로드는 백엔드 연동 필요
 
 ## 📝 라이센스
 

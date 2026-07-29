@@ -68,6 +68,13 @@ export interface ReportPayload {
   description?: string;
 }
 
+export interface DeviceTokenPayload {
+  token: string;
+  platform: "ios" | "android";
+  provider?: "fcm" | "apns";
+  deviceName?: string;
+}
+
 function unwrapList<T = any>(data: any): T[] {
   return Array.isArray(data) ? data : (data?.data ?? data?.items ?? []);
 }
@@ -250,6 +257,12 @@ export const pointsApi = {
   getWallet: async (): Promise<PointsWallet> => {
     const res = await apiClient.get("/api/points/wallet");
     return res.data;
+  },
+};
+
+export const notificationsApi = {
+  registerDeviceToken: async (payload: DeviceTokenPayload): Promise<void> => {
+    await apiClient.post("/api/notifications/device-tokens", payload);
   },
 };
 

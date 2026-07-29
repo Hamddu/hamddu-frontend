@@ -28,6 +28,7 @@ import SurveyQuestionsScreen from "./src/screens/SurveyQuestionsScreen";
 
 import { useAuthStore } from "./src/store/authStore";
 import { useXpLevelDetection } from "./src/hooks/useXpLevelUp";
+import { registerForPushNotifications } from "./src/services/notifications";
 
 const Tab = createBottomTabNavigator();
 const HomeStack = createNativeStackNavigator();
@@ -218,6 +219,15 @@ function MainTabs() {
 
 function AppInitializer({ children }: { children: React.ReactNode }) {
   useXpLevelDetection();
+  const accessToken = useAuthStore((s) => s.accessToken);
+
+  useEffect(() => {
+    if (!accessToken) return;
+
+    registerForPushNotifications().catch((error) => {
+      console.warn("Failed to register push notifications", error);
+    });
+  }, [accessToken]);
 
   return <>{children}</>;
 }
