@@ -58,6 +58,31 @@ yarn start -c
 npx expo start --tunnel
 ```
 
+## 🍎 iPhone 실기기 실행
+
+네이티브 기능을 확인할 때는 Expo Go 대신 iOS 개발 빌드로 실행합니다.
+
+### 처음 한 번만 필요한 설정
+1. iPhone을 USB로 연결하고 `이 컴퓨터를 신뢰`를 허용합니다.
+2. Xcode에서 `ios/app.xcworkspace`를 엽니다.
+3. `app` target > `Signing & Capabilities`로 이동합니다.
+4. `Automatically manage signing`을 체크하고 `Team`을 선택합니다.
+5. iPhone에서 `설정 > 개인정보 보호 및 보안 > 개발자 모드`를 켠 뒤 재시동합니다.
+6. 앱 설치 후 iPhone에서 `설정 > 일반 > VPN 및 기기 관리`로 이동해 개발자 앱을 신뢰합니다.
+
+### 실행 명령
+```bash
+npx expo run:ios --device
+```
+
+기기 선택 화면이 뜨면 `🔌 iPhone`을 선택합니다.
+
+### 자주 막히는 지점
+- `No code signing certificates`: Xcode `Signing & Capabilities`에서 Team을 선택합니다.
+- `Developer Mode disabled`: iPhone 개발자 모드를 켭니다.
+- `login.keychain` 암호 팝업: Mac 로그인/키체인 암호를 입력하고 `항상 허용`을 누릅니다.
+- `profile has not been explicitly trusted`: iPhone `VPN 및 기기 관리`에서 개발자 앱을 신뢰합니다.
+
 ## 📱 주요 기능
 
 ### 1. 홈 화면 (피드)
