@@ -18,6 +18,7 @@
       "adaptiveIcon": {
         "backgroundColor": "#FF7325"
       },
+      "softwareKeyboardLayoutMode": "resize",
       "permissions": ["VIBRATE"],
       "blockedPermissions": ["android.permission.RECORD_AUDIO"],
       "package": "com.hamddu.app"

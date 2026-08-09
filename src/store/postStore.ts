@@ -25,6 +25,7 @@ export interface Post {
   category: PostCategory | null;
   likeCount: number;
   commentCount: number;
+  viewCount?: number;
   likedByMe: boolean;
   createdAt: string;
   media?: PostMedia[];

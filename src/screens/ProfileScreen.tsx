@@ -37,18 +37,20 @@ function normalizeImageUrl(url?: string | null): string | null {
 }
 
 function CertCard({ item, wide = false }: { item: Challenge; wide?: boolean }) {
+  const [imageFailed, setImageFailed] = useState(false);
   const imageUrl = normalizeImageUrl(item.imageUrl);
   return (
     <View style={[styles.certCard, wide && styles.certCardWide]}>
       <View style={[styles.certThumb, wide && styles.certThumbWide]}>
-        {imageUrl ? (
+        {imageUrl && !imageFailed ? (
           <Image
             source={{ uri: imageUrl }}
             style={styles.certThumbImage}
             resizeMode="cover"
+            onError={() => setImageFailed(true)}
           />
         ) : (
-          <Text style={styles.certThumbText}>🧶</Text>
+          <Text style={styles.certThumbText}>사진 없음</Text>
         )}
       </View>
       <View style={styles.certItemInfo}>
@@ -66,7 +68,12 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const [certModalVisible, setCertModalVisible] = useState(false);
 
-  const { data: profile, isLoading: profileLoading } = useQuery({
+  const {
+    data: profile,
+    isLoading: profileLoading,
+    isError: profileError,
+    refetch: refetchProfile,
+  } = useQuery({
     queryKey: ["profile", "me"],
     queryFn: getMyProfile,
   });
@@ -78,7 +85,12 @@ export default function ProfileScreen() {
     queryKey: ["points", "wallet"],
     queryFn: pointsApi.getWallet,
   });
-  const { data: myChallenges = [] } = useQuery({
+  const {
+    data: myChallenges = [],
+    isLoading: myChallengesLoading,
+    isError: myChallengesError,
+    refetch: refetchMyChallenges,
+  } = useQuery({
     queryKey: ["challenges", "my"],
     queryFn: challengesApi.getMyChallenges,
   });
@@ -95,11 +107,26 @@ export default function ProfileScreen() {
     );
   }
 
-  const level = xpWallet?.currentLevel ?? 1;
-  const currentXp = xpWallet?.totalXp ?? 0;
-  const nextXp = xpWallet?.nextLevelThreshold ?? 100;
-  const xpPct = nextXp > 0 ? Math.min((currentXp / nextXp) * 100, 100) : 0;
-  const points = pointsWallet?.balance ?? 0;
+  if (profileError) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.centerState}>
+          <Text style={styles.emptyTitle}>마이 정보를 불러오지 못했어요</Text>
+          <Text style={styles.emptyText}>잠시 후 다시 시도해주세요</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => refetchProfile()} activeOpacity={0.75}>
+            <Text style={styles.retryButtonText}>다시 시도</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const xpPct =
+    xpWallet?.nextLevelThreshold && xpWallet.nextLevelThreshold > 0
+      ? Math.min((xpWallet.totalXp / xpWallet.nextLevelThreshold) * 100, 100)
+      : 0;
+  const displayName = profile?.nickname ?? "닉네임 없음";
+  const avatarText = displayName.slice(0, 2);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -108,42 +135,53 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.content}
       >
         <View style={styles.header}>
-          <Text style={styles.screenTitle}>마이</Text>
+          <View>
+            <Text style={styles.screenTitle}>마이</Text>
+            <Text style={styles.screenSubTitle}>내 뜨개 기록과 인증을 모아봤어요</Text>
+          </View>
         </View>
 
-        {/* 유저 카드 */}
         <View style={styles.userCard}>
           <View style={styles.avatarWrap}>
-            <Text style={styles.avatarEmoji}>🐹</Text>
-            <View style={styles.levelBadge}>
-              <Text style={styles.levelText}>Lv.{level}</Text>
-            </View>
+            <Text style={styles.avatarText}>{avatarText}</Text>
           </View>
           <View style={styles.userInfo}>
-            <Text style={styles.username}>
-              {profile?.nickname ?? "함뜨개인"}
-            </Text>
-            <View style={styles.xpRow}>
-              <View style={styles.xpLabels}>
-                <Text style={styles.xpLabel}>
-                  XP {currentXp} / {nextXp}
-                </Text>
-                <Text style={styles.xpNext}>
-                  다음 레벨까지 {nextXp - currentXp}
-                </Text>
-              </View>
-              <View style={styles.xpBar}>
-                <View style={[styles.xpFill, { width: `${xpPct}%` as any }]} />
-              </View>
+            <View style={styles.userNameRow}>
+              <Text style={styles.username} numberOfLines={1}>
+                {displayName}
+              </Text>
+              {xpWallet ? (
+                <View style={styles.levelBadge}>
+                  <Text style={styles.levelText}>Lv.{xpWallet.currentLevel}</Text>
+                </View>
+              ) : null}
             </View>
+            {xpWallet ? (
+              <View style={styles.xpRow}>
+                <View style={styles.xpLabels}>
+                  <Text style={styles.xpLabel}>
+                    XP {xpWallet.totalXp} / {xpWallet.nextLevelThreshold ?? "-"}
+                  </Text>
+                  {typeof xpWallet.nextLevelThreshold === "number" ? (
+                    <Text style={styles.xpNext}>
+                      다음 레벨까지 {Math.max(xpWallet.nextLevelThreshold - xpWallet.totalXp, 0)}
+                    </Text>
+                  ) : null}
+                </View>
+                <View style={styles.xpBar}>
+                  <View style={[styles.xpFill, { width: `${xpPct}%` as any }]} />
+                </View>
+              </View>
+            ) : null}
           </View>
         </View>
 
-        {/* 포인트 / 인증 수 */}
         <View style={styles.statsCard}>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{points.toLocaleString()}</Text>
-            <Text style={styles.statStars}>★ POINT</Text>
+            <Text style={styles.statValue}>
+              {pointsWallet ? pointsWallet.balance.toLocaleString() : "-"}
+            </Text>
+            <Text style={styles.statLabel}>포인트</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
@@ -160,7 +198,7 @@ export default function ProfileScreen() {
             <View>
               <Text style={styles.certSectionTitle}>나의 인증 게시글</Text>
               <Text style={styles.certSectionSub}>
-                튜토리얼을 완료할 때마다 자동으로 모여요
+                튜토리얼을 완료하면 여기에 모여요
               </Text>
             </View>
             <TouchableOpacity
@@ -179,10 +217,22 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
 
-          {myChallenges.length === 0 ? (
+          {myChallengesLoading ? (
+            <View style={styles.emptyBox}>
+              <ActivityIndicator size="small" color={PRIMARY} />
+            </View>
+          ) : myChallengesError ? (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyTitle}>인증 게시글을 불러오지 못했어요</Text>
+              <Text style={styles.emptyText}>잠시 후 다시 시도해주세요</Text>
+              <TouchableOpacity style={styles.retryButton} onPress={() => refetchMyChallenges()} activeOpacity={0.75}>
+                <Text style={styles.retryButtonText}>다시 시도</Text>
+              </TouchableOpacity>
+            </View>
+          ) : myChallenges.length === 0 ? (
             <View style={styles.emptyBox}>
               <Text style={styles.emptyText}>
-                아직 인증한 튜토리얼이 없어요 🐹
+                아직 인증한 튜토리얼이 없어요
               </Text>
             </View>
           ) : (
@@ -241,173 +291,228 @@ const INK1 = "#1A1A1A";
 const INK2 = "#404040";
 const INK3 = "#8A8A8A";
 const LINE = "#ECECEC";
+const SURFACE = "#F7F5F2";
+const PRIMARY_DEEP = "#C7521A";
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#FFFFFF" },
   container: { flex: 1, backgroundColor: "#FFFFFF" },
-  content: { paddingBottom: 40 },
+  content: { paddingBottom: 48 },
+  centerState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 6,
+    paddingTop: 10,
+    paddingBottom: 14,
   },
   screenTitle: {
-    flex: 1,
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "800",
     color: INK1,
-    letterSpacing: -0.4,
+    lineHeight: 30,
+  },
+  screenSubTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: INK3,
+    marginTop: 2,
   },
   userCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
     backgroundColor: "#fff",
-    borderRadius: 20,
-    padding: 18,
+    borderRadius: 16,
+    padding: 16,
     marginHorizontal: 20,
-    marginBottom: 12,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: LINE,
   },
   avatarWrap: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    width: 66,
+    height: 66,
+    borderRadius: 33,
     backgroundColor: PRIMARY_SOFT,
     alignItems: "center",
     justifyContent: "center",
-    position: "relative",
+    marginRight: 14,
   },
-  avatarEmoji: { fontSize: 36 },
-  levelBadge: {
-    position: "absolute",
-    bottom: -2,
-    right: -2,
-    backgroundColor: PRIMARY,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 999,
-    borderWidth: 2,
-    borderColor: "#fff",
+  avatarText: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: PRIMARY_DEEP,
   },
-  levelText: { fontSize: 10, fontWeight: "800", color: "#fff" },
   userInfo: { flex: 1, minWidth: 0 },
+  userNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minWidth: 0,
+    marginBottom: 10,
+  },
   username: {
+    flexShrink: 1,
     fontSize: 18,
     fontWeight: "800",
     color: INK1,
-    letterSpacing: -0.3,
-    marginBottom: 8,
   },
-  xpRow: { gap: 3 },
+  levelBadge: {
+    backgroundColor: PRIMARY,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  levelText: { fontSize: 10, fontWeight: "800", color: "#fff" },
+  xpRow: { gap: 4 },
   xpLabels: {
     flexDirection: "row",
     justifyContent: "space-between",
+    gap: 8,
     marginBottom: 3,
   },
   xpLabel: { fontSize: 10, color: INK3, fontWeight: "700" },
   xpNext: { fontSize: 10, color: PRIMARY, fontWeight: "700" },
   xpBar: {
-    height: 6,
-    backgroundColor: LINE,
-    borderRadius: 3,
+    height: 7,
+    backgroundColor: SURFACE,
+    borderRadius: 4,
     overflow: "hidden",
   },
-  xpFill: { height: "100%", backgroundColor: PRIMARY, borderRadius: 3 },
+  xpFill: { height: "100%", backgroundColor: PRIMARY, borderRadius: 4 },
   statsCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: SURFACE,
     borderRadius: 16,
-    padding: 18,
+    paddingVertical: 17,
+    paddingHorizontal: 12,
     marginHorizontal: 20,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: LINE,
+    marginBottom: 22,
   },
   statItem: { flex: 1, alignItems: "center" },
   statValue: {
-    fontSize: 30,
+    fontSize: 26,
     fontWeight: "800",
     color: INK1,
-    letterSpacing: -1,
   },
   statValueOrange: { color: PRIMARY },
-  statStars: { fontSize: 11, color: PRIMARY, fontWeight: "700", marginTop: 2 },
-  statLabel: { fontSize: 11, color: INK3, fontWeight: "700", marginTop: 2 },
+  statLabel: { fontSize: 11, color: INK3, fontWeight: "800", marginTop: 3 },
   statDivider: {
     width: 1,
     alignSelf: "stretch",
-    backgroundColor: LINE,
+    backgroundColor: "#E6DED7",
     marginVertical: 4,
   },
-  certSection: { paddingHorizontal: 20, marginBottom: 20 },
+  certSection: { marginBottom: 22 },
   certSectionHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
+    paddingHorizontal: 20,
     marginBottom: 12,
   },
   certSectionTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "800",
     color: INK1,
-    letterSpacing: -0.3,
   },
-  certSectionSub: { fontSize: 11, color: INK3, marginTop: 2 },
-  certSectionAll: { fontSize: 11, fontWeight: "700", color: PRIMARY },
+  certSectionSub: {
+    fontSize: 12,
+    color: INK3,
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  certSectionAll: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: PRIMARY,
+    paddingTop: 2,
+  },
   certSectionAllDisabled: { color: INK3 },
   certCarousel: {
     gap: 10,
-    paddingRight: 20,
+    paddingHorizontal: 20,
   },
   certCard: {
-    width: 150,
+    width: 158,
     backgroundColor: "#fff",
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: LINE,
   },
   certCardWide: {
-    width: "48%",
-    marginBottom: 10,
+    width: "48.5%",
+    marginBottom: 12,
   },
   certThumb: {
-    height: 112,
-    backgroundColor: "#F2F2F2",
+    height: 122,
+    backgroundColor: SURFACE,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
   },
   certThumbWide: {
-    height: 130,
+    height: 136,
   },
   certThumbImage: {
     width: "100%",
     height: "100%",
   },
-  certThumbText: { fontSize: 28 },
-  certItemInfo: { padding: 8 },
-  certItemTut: { fontSize: 11, fontWeight: "800", color: INK1 },
-  certItemDate: { fontSize: 10, color: INK3, marginTop: 1 },
+  certThumbText: { fontSize: 11, color: INK3, fontWeight: "700" },
+  certItemInfo: { padding: 10 },
+  certItemTut: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: INK1,
+    lineHeight: 17,
+  },
+  certItemDate: {
+    fontSize: 11,
+    color: INK3,
+    fontWeight: "600",
+    marginTop: 2,
+  },
   emptyBox: {
-    backgroundColor: "#fff",
-    borderRadius: 14,
+    backgroundColor: SURFACE,
+    borderRadius: 16,
     padding: 24,
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: LINE,
+    marginHorizontal: 20,
+  },
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: INK1,
+    marginBottom: 5,
+    textAlign: "center",
   },
   emptyText: { fontSize: 13, color: INK3, fontWeight: "600" },
+  retryButton: {
+    minHeight: 36,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: PRIMARY,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 14,
+  },
+  retryButtonText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#fff",
+  },
   logoutBtn: {
     marginHorizontal: 20,
     height: 48,
-    borderRadius: 12,
-    backgroundColor: "#F5F5F5",
+    borderRadius: 14,
+    backgroundColor: SURFACE,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -430,7 +535,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     color: INK1,
-    letterSpacing: -0.3,
   },
   modalSub: {
     fontSize: 11,
@@ -442,7 +546,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: SURFACE,
   },
   modalCloseText: {
     fontSize: 13,

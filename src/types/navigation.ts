@@ -21,6 +21,7 @@ export type HomeStackParamList = {
 export type CommunityStackParamList = {
   CommunityFeed: undefined;
   PostDetail: { postId: string };
+  ChallengeDetail: { challengeId: string };
   AddPost: undefined;
 };
 

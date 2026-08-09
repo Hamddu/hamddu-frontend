@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
   flex: { flex: 1 },
   scroll: { flex: 1 },
-  content: { padding: 20, paddingBottom: 8 },
+  content: { padding: 20, paddingBottom: 96 },
   label: { fontSize: 13, fontWeight: '700', color: INK1, marginBottom: 8 },
   required: { color: PRIMARY },
   fieldHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 },

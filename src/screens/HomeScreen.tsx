@@ -8,18 +8,80 @@ import {
   Image,
   Modal,
   Animated,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import Svg, { Defs, Mask, Path } from "react-native-svg";
+import Svg, { Defs, Mask, Path, type SvgProps } from "react-native-svg";
 import BackgroundHamdde from "../../assets/home/background-hamdde.svg";
 import Hat from "../../assets/home/hat.svg";
-import ButtonBubble from "../../assets/home/button-bubble.svg";
-import ButtonBubbleOff from "../../assets/home/button-bubble-off.svg";
-import Button1 from "../../assets/home/button-1.svg";
-import Button1Off from "../../assets/home/button-1-off.svg";
+import Knitting01Active from "../../assets/home/tutorial/knitting/icon/knitting_01_active.svg";
+import Knitting01Disabled from "../../assets/home/tutorial/knitting/icon/knitting_01_disabled.svg";
+import Knitting02Active from "../../assets/home/tutorial/knitting/icon/knitting_02_active.svg";
+import Knitting02Disabled from "../../assets/home/tutorial/knitting/icon/knitting_02_disabled.svg";
+import Knitting03Active from "../../assets/home/tutorial/knitting/icon/knitting_03_active.svg";
+import Knitting03Disabled from "../../assets/home/tutorial/knitting/icon/knitting_03_disabled.svg";
+import Knitting04Active from "../../assets/home/tutorial/knitting/icon/knitting_04_active.svg";
+import Knitting04Disabled from "../../assets/home/tutorial/knitting/icon/knitting_04_disabled.svg";
+import Knitting05Active from "../../assets/home/tutorial/knitting/icon/knitting_05_active.svg";
+import Knitting05Disabled from "../../assets/home/tutorial/knitting/icon/knitting_05_disabled.svg";
+import Knitting06Active from "../../assets/home/tutorial/knitting/icon/knitting_06_active.svg";
+import Knitting06Disabled from "../../assets/home/tutorial/knitting/icon/knitting_06_disabled.svg";
+import Knitting07Active from "../../assets/home/tutorial/knitting/icon/knitting_07_active.svg";
+import Knitting07Disabled from "../../assets/home/tutorial/knitting/icon/knitting_07_disabled.svg";
+import Knitting01PopActive from "../../assets/home/tutorial/knitting/pop/knitting_01_pop_active.svg";
+import Knitting01PopDisabled from "../../assets/home/tutorial/knitting/pop/knitting_01_pop_disabled.svg";
+import Knitting02PopActive from "../../assets/home/tutorial/knitting/pop/knitting_02_pop_active.svg";
+import Knitting02PopDisabled from "../../assets/home/tutorial/knitting/pop/knitting_02_pop_disabled.svg";
+import Knitting03PopActive from "../../assets/home/tutorial/knitting/pop/knitting_03_pop_active.svg";
+import Knitting03PopDisabled from "../../assets/home/tutorial/knitting/pop/knitting_03_pop_disabled.svg";
+import Knitting04PopActive from "../../assets/home/tutorial/knitting/pop/knitting_04_pop_active.svg";
+import Knitting04PopDisabled from "../../assets/home/tutorial/knitting/pop/knitting_04_pop_disabled.svg";
+import Knitting05PopActive from "../../assets/home/tutorial/knitting/pop/knitting_05_pop_active.svg";
+import Knitting05PopDisabled from "../../assets/home/tutorial/knitting/pop/knitting_05_pop_disabled.svg";
+import Knitting06PopActive from "../../assets/home/tutorial/knitting/pop/knitting_06_pop_active.svg";
+import Knitting06PopDisabled from "../../assets/home/tutorial/knitting/pop/knitting_06_pop_disabled.svg";
+import Knitting07PopActive from "../../assets/home/tutorial/knitting/pop/knitting_07_pop_active.svg";
+import Knitting07PopDisabled from "../../assets/home/tutorial/knitting/pop/knitting_07_pop_disabled.svg";
+import Crochet01Active from "../../assets/home/tutorial/crochet/icon/crochet_01_active.svg";
+import Crochet01Disabled from "../../assets/home/tutorial/crochet/icon/crochet_01_disabled.svg";
+import Crochet02Active from "../../assets/home/tutorial/crochet/icon/crochet_02_active.svg";
+import Crochet02Disabled from "../../assets/home/tutorial/crochet/icon/crochet_02_disabled.svg";
+import Crochet03Active from "../../assets/home/tutorial/crochet/icon/crochet_03_active.svg";
+import Crochet03Disabled from "../../assets/home/tutorial/crochet/icon/crochet_03_disabled.svg";
+import Crochet04Active from "../../assets/home/tutorial/crochet/icon/crochet_04_active.svg";
+import Crochet04Disabled from "../../assets/home/tutorial/crochet/icon/crochet_04_disabled.svg";
+import Crochet05Active from "../../assets/home/tutorial/crochet/icon/crochet_05_active.svg";
+import Crochet05Disabled from "../../assets/home/tutorial/crochet/icon/crochet_05_disabled.svg";
+import Crochet06Active from "../../assets/home/tutorial/crochet/icon/crochet_06_active.svg";
+import Crochet06Disabled from "../../assets/home/tutorial/crochet/icon/crochet_06_disabled.svg";
+import Crochet07Active from "../../assets/home/tutorial/crochet/icon/crochet_07_active.svg";
+import Crochet07Disabled from "../../assets/home/tutorial/crochet/icon/crochet_07_disabled.svg";
+import Crochet08Active from "../../assets/home/tutorial/crochet/icon/crochet_08_active.svg";
+import Crochet08Disabled from "../../assets/home/tutorial/crochet/icon/crochet_08_disabled.svg";
+import Crochet09Active from "../../assets/home/tutorial/crochet/icon/crochet_09_active.svg";
+import Crochet09Disabled from "../../assets/home/tutorial/crochet/icon/crochet_09_disabled.svg";
+import Crochet01PopActive from "../../assets/home/tutorial/crochet/pop/crochet_01_pop_active.svg";
+import Crochet01PopDisabled from "../../assets/home/tutorial/crochet/pop/crochet_01_pop_disabled.svg";
+import Crochet02PopActive from "../../assets/home/tutorial/crochet/pop/crochet_02_pop_active.svg";
+import Crochet02PopDisabled from "../../assets/home/tutorial/crochet/pop/crochet_02_pop_disabled.svg";
+import Crochet03PopActive from "../../assets/home/tutorial/crochet/pop/crochet_03_pop_active.svg";
+import Crochet03PopDisabled from "../../assets/home/tutorial/crochet/pop/crochet_03_pop_disabled.svg";
+import Crochet04PopActive from "../../assets/home/tutorial/crochet/pop/crochet_04_pop_active.svg";
+import Crochet04PopDisabled from "../../assets/home/tutorial/crochet/pop/crochet_04_pop_disabled.svg";
+import Crochet05PopActive from "../../assets/home/tutorial/crochet/pop/crochet_05_pop_active.svg";
+import Crochet05PopDisabled from "../../assets/home/tutorial/crochet/pop/crochet_05_pop_disabled.svg";
+import Crochet06PopActive from "../../assets/home/tutorial/crochet/pop/crochet_06_pop_active.svg";
+import Crochet06PopDisabled from "../../assets/home/tutorial/crochet/pop/crochet_06_pop_disabled.svg";
+import Crochet07PopActive from "../../assets/home/tutorial/crochet/pop/crochet_07_pop_active.svg";
+import Crochet07PopDisabled from "../../assets/home/tutorial/crochet/pop/crochet_07_pop_disabled.svg";
+import Crochet08PopActive from "../../assets/home/tutorial/crochet/pop/crochet_08_pop_active.svg";
+import Crochet08PopDisabled from "../../assets/home/tutorial/crochet/pop/crochet_08_pop_disabled.svg";
+import Crochet09PopActive from "../../assets/home/tutorial/crochet/pop/crochet_09_pop_active.svg";
+import Crochet09PopDisabled from "../../assets/home/tutorial/crochet/pop/crochet_09_pop_disabled.svg";
+import CrochetLine from "../../assets/home/tutorial/crochet/line.svg";
 import { HomeStackParamList } from "../types/navigation";
 import {
   challengesApi,
@@ -33,8 +95,9 @@ import { getMyProfile } from "../api/users.api";
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList>;
 type Category = "knit" | "crochet";
 type LessonState = "done" | "progress" | "open";
-const NODE_BUTTON_SIZE = 112;
-const NODE_BUTTON_OFFSET = NODE_BUTTON_SIZE / 2;
+type TutorialSvg = React.ComponentType<SvgProps>;
+const NODE_ICON_SIZE = 122;
+const MAP_DESIGN_WIDTH = 405;
 const HERO_HEIGHT = 288;
 const HERO_COLLAPSED_HEIGHT = 132;
 const HERO_COLLAPSE_DISTANCE = 150;
@@ -52,8 +115,24 @@ const HERO_STITCHES = [
   { dash: 6, gap: 7 },
 ];
 const MAP_THREAD_PATH =
-  "M62 122 C108 112 138 96 190 100 C260 104 320 132 318 204 C317 236 307 248 296 250 C252 270 226 318 170 365 C118 398 82 430 48 482 C8 544 38 628 126 628 C148 628 164 620 172 610 C204 584 246 558 292 540";
+  "M82 131 C128 96 173 76 223 69 C290 60 354 129 333 205 C315 271 245 246 197 285 C146 326 108 349 64 367 C15 388 22 507 98 548 C145 574 159 516 200 487 C246 455 287 426 333 407";
 const AnimatedPath = Animated.createAnimatedComponent(Path);
+
+interface TutorialNodeAsset {
+  ActiveIcon: TutorialSvg;
+  DisabledIcon: TutorialSvg;
+  ActivePop: TutorialSvg;
+  DisabledPop: TutorialSvg;
+}
+
+interface TutorialNodeLayout {
+  iconX: number;
+  iconY: number;
+  popX: number;
+  popY: number;
+  popWidth: number;
+  popHeight: number;
+}
 
 interface Lesson {
   id: string;
@@ -64,14 +143,48 @@ interface Lesson {
   videoId?: string;
 }
 
-const NODE_LAYOUT = [
-  { left: "18%", top: 94 },
-  { left: "55%", top: 72 },
-  { left: "86%", top: 222 },
-  { left: "49%", top: 337 },
-  { left: "14%", top: 454 },
-  { left: "50%", top: 582 },
-  { left: "85%", top: 512 },
+const KNITTING_ASSETS: TutorialNodeAsset[] = [
+  { ActiveIcon: Knitting01Active, DisabledIcon: Knitting01Disabled, ActivePop: Knitting01PopActive, DisabledPop: Knitting01PopDisabled },
+  { ActiveIcon: Knitting02Active, DisabledIcon: Knitting02Disabled, ActivePop: Knitting02PopActive, DisabledPop: Knitting02PopDisabled },
+  { ActiveIcon: Knitting03Active, DisabledIcon: Knitting03Disabled, ActivePop: Knitting03PopActive, DisabledPop: Knitting03PopDisabled },
+  { ActiveIcon: Knitting04Active, DisabledIcon: Knitting04Disabled, ActivePop: Knitting04PopActive, DisabledPop: Knitting04PopDisabled },
+  { ActiveIcon: Knitting05Active, DisabledIcon: Knitting05Disabled, ActivePop: Knitting05PopActive, DisabledPop: Knitting05PopDisabled },
+  { ActiveIcon: Knitting06Active, DisabledIcon: Knitting06Disabled, ActivePop: Knitting06PopActive, DisabledPop: Knitting06PopDisabled },
+  { ActiveIcon: Knitting07Active, DisabledIcon: Knitting07Disabled, ActivePop: Knitting07PopActive, DisabledPop: Knitting07PopDisabled },
+];
+
+const CROCHET_ASSETS: TutorialNodeAsset[] = [
+  { ActiveIcon: Crochet01Active, DisabledIcon: Crochet01Disabled, ActivePop: Crochet01PopActive, DisabledPop: Crochet01PopDisabled },
+  { ActiveIcon: Crochet02Active, DisabledIcon: Crochet02Disabled, ActivePop: Crochet02PopActive, DisabledPop: Crochet02PopDisabled },
+  { ActiveIcon: Crochet03Active, DisabledIcon: Crochet03Disabled, ActivePop: Crochet03PopActive, DisabledPop: Crochet03PopDisabled },
+  { ActiveIcon: Crochet04Active, DisabledIcon: Crochet04Disabled, ActivePop: Crochet04PopActive, DisabledPop: Crochet04PopDisabled },
+  { ActiveIcon: Crochet05Active, DisabledIcon: Crochet05Disabled, ActivePop: Crochet05PopActive, DisabledPop: Crochet05PopDisabled },
+  { ActiveIcon: Crochet06Active, DisabledIcon: Crochet06Disabled, ActivePop: Crochet06PopActive, DisabledPop: Crochet06PopDisabled },
+  { ActiveIcon: Crochet07Active, DisabledIcon: Crochet07Disabled, ActivePop: Crochet07PopActive, DisabledPop: Crochet07PopDisabled },
+  { ActiveIcon: Crochet08Active, DisabledIcon: Crochet08Disabled, ActivePop: Crochet08PopActive, DisabledPop: Crochet08PopDisabled },
+  { ActiveIcon: Crochet09Active, DisabledIcon: Crochet09Disabled, ActivePop: Crochet09PopActive, DisabledPop: Crochet09PopDisabled },
+];
+
+const KNITTING_NODE_LAYOUT: TutorialNodeLayout[] = [
+  { iconX: 21, iconY: 70, popX: 40, popY: 30, popWidth: 82, popHeight: 50 },
+  { iconX: 162, iconY: 8, popX: 183, popY: 116, popWidth: 78, popHeight: 50 },
+  { iconX: 272, iconY: 144, popX: 293, popY: 252, popWidth: 78, popHeight: 50 },
+  { iconX: 136, iconY: 224, popX: 152, popY: 332, popWidth: 89, popHeight: 50 },
+  { iconX: 3, iconY: 306, popX: 4, popY: 265, popWidth: 119, popHeight: 50 },
+  { iconX: 139, iconY: 426, popX: 156, popY: 535, popWidth: 89, popHeight: 50 },
+  { iconX: 272, iconY: 346, popX: 294, popY: 455, popWidth: 78, popHeight: 50 },
+];
+
+const CROCHET_NODE_LAYOUT: TutorialNodeLayout[] = [
+  { iconX: 21, iconY: 20, popX: 24, popY: 129, popWidth: 115, popHeight: 54 },
+  { iconX: 151, iconY: 72, popX: 166, popY: 33, popWidth: 92, popHeight: 55 },
+  { iconX: 276, iconY: 144, popX: 298, popY: 105, popWidth: 78, popHeight: 55 },
+  { iconX: 214, iconY: 319, popX: 230, popY: 278, popWidth: 92, popHeight: 55 },
+  { iconX: 77, iconY: 245, popX: 92, popY: 353, popWidth: 92, popHeight: 54 },
+  { iconX: 13, iconY: 440, popX: 35, popY: 550, popWidth: 78, popHeight: 54 },
+  { iconX: 146, iconY: 515, popX: 152, popY: 474, popWidth: 110, popHeight: 55 },
+  { iconX: 276, iconY: 590, popX: 282, popY: 548, popWidth: 110, popHeight: 55 },
+  { iconX: 69, iconY: 693, popX: 84, popY: 804, popWidth: 92, popHeight: 54 },
 ];
 
 function getLessonState(history: WatchHistory | undefined): {
@@ -98,13 +211,10 @@ function contentToLesson(
   };
 }
 
-function getBubbleWidth(title: string): number {
-  return Math.min(174, Math.max(88, title.length * 15 + 26));
-}
-
 export default function HomeScreen() {
   const navigation = useNavigation<NavigationProp>();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
   const [category, setCategory] = useState<Category>("knit");
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [heroStitch, setHeroStitch] = useState({
@@ -235,6 +345,7 @@ export default function HomeScreen() {
   const certifiedContentIds = new Set(
     myChallenges.map((challenge) => challenge.content?.id).filter(Boolean),
   );
+  const isCrochet = category === "crochet";
 
   const lessons = tutorials
     .filter((c) => c.interests === (category === "knit" ? "knitting" : "crochet"))
@@ -244,6 +355,11 @@ export default function HomeScreen() {
   const selectedHistory = selectedLesson
     ? historyMap[selectedLesson.contentId]
     : undefined;
+  const nodeAssets = isCrochet ? CROCHET_ASSETS : KNITTING_ASSETS;
+  const nodeLayouts = isCrochet ? CROCHET_NODE_LAYOUT : KNITTING_NODE_LAYOUT;
+  const mapBaseHeight = isCrochet ? 880 : 640;
+  const mapScale = Math.min(1, (windowWidth - 46) / MAP_DESIGN_WIDTH);
+  const mapHeight = mapBaseHeight * mapScale;
 
   const isUnlocked = (index: number) =>
     index === 0 ||
@@ -314,7 +430,7 @@ export default function HomeScreen() {
             </Animated.Text>
           </View>
           <Animated.Text style={[styles.heroSub, { opacity: heroSubOpacity }]}>
-            안녕, {profile?.nickname ?? "포근한 햄찌"}님!
+            {profile?.nickname ? `안녕, ${profile.nickname}님!` : "안녕하세요!"}
           </Animated.Text>
           <Animated.View
             pointerEvents="none"
@@ -425,81 +541,95 @@ export default function HomeScreen() {
               <Text style={styles.emptyText}>아직 등록된 강의가 없어요</Text>
             </View>
           ) : (
-            <View style={styles.map}>
-              <Svg
-                pointerEvents="none"
-                style={styles.mapThread}
-                viewBox="0 0 344 700"
-                preserveAspectRatio="none"
-              >
-                <Path
-                  d={MAP_THREAD_PATH}
-                  stroke="#E9DFD7"
-                  strokeWidth={24}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  fill="none"
+            <View style={[styles.map, { minHeight: mapHeight }]}>
+              {isCrochet ? (
+                <CrochetLine
+                  pointerEvents="none"
+                  width={MAP_DESIGN_WIDTH * mapScale}
+                  height={744 * mapScale}
+                  style={[styles.crochetMapThread, { top: 85 * mapScale }]}
                 />
-                <Path
-                  d={MAP_THREAD_PATH}
-                  stroke="#C4BDB7"
-                  strokeWidth={5}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeDasharray="8 12"
-                  fill="none"
-                />
-              </Svg>
-              {lessons.slice(0, NODE_LAYOUT.length).map((lesson, index) => {
+              ) : (
+                <Svg
+                  pointerEvents="none"
+                  style={styles.mapThread}
+                  viewBox={`0 0 ${MAP_DESIGN_WIDTH} ${mapBaseHeight}`}
+                  preserveAspectRatio="none"
+                >
+                  <Path
+                    d={MAP_THREAD_PATH}
+                    stroke="#E9DFD7"
+                    strokeWidth={24}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                  />
+                  <Path
+                    d={MAP_THREAD_PATH}
+                    stroke="#C4BDB7"
+                    strokeWidth={5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeDasharray="8 12"
+                    fill="none"
+                  />
+                </Svg>
+              )}
+              {lessons.slice(0, nodeLayouts.length).map((lesson, index) => {
                 const unlocked = isUnlocked(index);
-                const layout = NODE_LAYOUT[index];
+                const layout = nodeLayouts[index];
+                const asset = nodeAssets[index];
                 const completed =
                   lesson.state === "done" ||
                   certifiedContentIds.has(lesson.contentId);
-                const ButtonIcon = completed ? Button1 : Button1Off;
-                const BubbleIcon = completed ? ButtonBubble : ButtonBubbleOff;
-                const bubbleWidth = getBubbleWidth(lesson.title);
+                const NodeIcon = completed ? asset.ActiveIcon : asset.DisabledIcon;
+                const NodePop = completed ? asset.ActivePop : asset.DisabledPop;
+                const frameTop = Math.min(layout.iconY, layout.popY);
+                const frameWidth = Math.max(
+                  NODE_ICON_SIZE,
+                  layout.popX - layout.iconX + layout.popWidth,
+                );
+                const frameHeight =
+                  Math.max(layout.iconY + NODE_ICON_SIZE, layout.popY + layout.popHeight) -
+                  frameTop;
+
                 return (
                   <TouchableOpacity
                     key={lesson.id}
                     style={[
-                      styles.nodeSvgButton,
+                      styles.nodeButton,
                       {
-                        left: layout.left as any,
-                        top: layout.top - 48,
+                        left: layout.iconX * mapScale,
+                        top: frameTop * mapScale,
+                        width: frameWidth * mapScale,
+                        height: frameHeight * mapScale,
                       },
                     ]}
                     onPress={() => setSelectedIndex(index)}
                     activeOpacity={0.82}
+                    disabled={!unlocked}
                   >
-                    <ButtonIcon
-                      width={NODE_BUTTON_SIZE}
-                      height={NODE_BUTTON_SIZE}
-                      style={styles.nodeSvg}
-                    />
-                    <View
+                    <NodeIcon
+                      width={NODE_ICON_SIZE * mapScale}
+                      height={NODE_ICON_SIZE * mapScale}
                       style={[
-                        styles.nodeBubble,
-                        !completed && styles.nodeBubbleOff,
-                        { width: bubbleWidth },
+                        styles.nodeIcon,
+                        {
+                          top: (layout.iconY - frameTop) * mapScale,
+                        },
                       ]}
-                    >
-                      <BubbleIcon
-                        width={bubbleWidth}
-                        height={completed ? 55 : 54}
-                        style={styles.nodeBubbleSvg}
-                      />
-                      <Text
-                        style={[
-                          styles.nodeBubbleText,
-                          !completed && styles.nodeBubbleTextOff,
-                          completed && styles.nodeBubbleTextActive,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {lesson.title}
-                      </Text>
-                    </View>
+                    />
+                    <NodePop
+                      width={layout.popWidth * mapScale}
+                      height={layout.popHeight * mapScale}
+                      style={[
+                        styles.nodePop,
+                        {
+                          left: (layout.popX - layout.iconX) * mapScale,
+                          top: (layout.popY - frameTop) * mapScale,
+                        },
+                      ]}
+                    />
                   </TouchableOpacity>
                 );
               })}
@@ -726,51 +856,24 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     width: "100%",
-    height: 700,
+    height: "100%",
   },
-  nodeSvgButton: {
+  crochetMapThread: {
     position: "absolute",
-    width: NODE_BUTTON_SIZE,
-    height: 164,
-    transform: [{ translateX: -NODE_BUTTON_OFFSET }],
+    left: 0,
+    right: 0,
+    overflow: "hidden",
+  },
+  nodeButton: {
+    position: "absolute",
     zIndex: 1,
   },
-  nodeSvg: {
+  nodeIcon: {
     position: "absolute",
     left: 0,
-    top: 20,
   },
-  nodeBubble: {
+  nodePop: {
     position: "absolute",
-    top: 0,
-    alignSelf: "center",
-    width: 82,
-    height: 55,
-    alignItems: "center",
-    paddingTop: 7,
-  },
-  nodeBubbleOff: {
-    width: 78,
-    height: 54,
-    top: 104,
-    paddingTop: 27,
-  },
-  nodeBubbleSvg: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-  },
-  nodeBubbleText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "800",
-    letterSpacing: -0.3,
-  },
-  nodeBubbleTextOff: {
-    color: "#C4BDB7",
-  },
-  nodeBubbleTextActive: {
-    color: "#fff",
   },
   empty: {
     paddingVertical: 60,

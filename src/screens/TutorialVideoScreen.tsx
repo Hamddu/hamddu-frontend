@@ -486,7 +486,11 @@ export default function TutorialVideoScreen() {
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={handleSkip} activeOpacity={1} />
-          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + 16 }]}>
+          <ScrollView
+            style={styles.modalSheet}
+            contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
+            keyboardShouldPersistTaps="handled"
+          >
             <View style={styles.modalHandle} />
 
             <Text style={styles.modalTitle}>🏆 인증 제출</Text>
@@ -545,7 +549,7 @@ export default function TutorialVideoScreen() {
             <TouchableOpacity onPress={handleSkip} style={styles.skipBtn}>
               <Text style={styles.skipText}>건너뛰기</Text>
             </TouchableOpacity>
-          </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </Modal>}
 
@@ -800,6 +804,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.5)",
   },
   modalSheet: {
+    maxHeight: "86%",
     backgroundColor: "#fff",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,

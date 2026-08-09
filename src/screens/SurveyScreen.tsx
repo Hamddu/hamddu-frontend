@@ -7,6 +7,8 @@ import {
   TextInput,
   ScrollView,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -137,104 +139,109 @@ export default function SurveyScreen() {
 
   return (
     <SafeAreaView style={styles.flex}>
-      <View style={styles.navBar} />
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <View style={styles.navBar} />
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <Text style={styles.sparkle}>✱</Text>
-        <Text style={styles.headline}>나를 표현할{"\n"}프로필을 만들어요</Text>
-        <Text style={styles.sub}>마술봉을 누르면 랜덤 닉네임을 받아와요.{"\n"}최대 {MAX_RANDOM}번까지 시도할 수 있어요.</Text>
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          <Text style={styles.sparkle}>✱</Text>
+          <Text style={styles.headline}>나를 표현할{"\n"}프로필을 만들어요</Text>
+          <Text style={styles.sub}>마술봉을 누르면 랜덤 닉네임을 받아와요.{"\n"}최대 {MAX_RANDOM}번까지 시도할 수 있어요.</Text>
 
-        <View style={styles.avatarSection}>
-          <View style={styles.avatarWrap}>
-            <View style={styles.avatarGlow} />
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarEmoji}>🐹</Text>
+          <View style={styles.avatarSection}>
+            <View style={styles.avatarWrap}>
+              <View style={styles.avatarGlow} />
+              <View style={styles.avatarCircle}>
+                <Text style={styles.avatarEmoji}>🐹</Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.wandBtn, randomExhausted && styles.wandBtnDisabled]}
+                onPress={handleRandom}
+                activeOpacity={0.85}
+                disabled={randomExhausted || issueMutation.isPending}
+              >
+                {issueMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Text style={styles.wandIcon}>✦</Text>
+                    <Text style={styles.wandText}>랜덤</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={[styles.wandBtn, randomExhausted && styles.wandBtnDisabled]}
-              onPress={handleRandom}
-              activeOpacity={0.85}
-              disabled={randomExhausted || issueMutation.isPending}
-            >
-              {issueMutation.isPending ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <Text style={styles.wandIcon}>✦</Text>
-                  <Text style={styles.wandText}>랜덤</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-          <Text style={[styles.avatarHint, randomExhausted && styles.avatarHintWarn]}>
-            {randomExhausted
-              ? "랜덤 시도 횟수를 모두 사용했어요"
-              : `✨ 랜덤 남은 횟수 ${MAX_RANDOM - randomCount}번`}
-          </Text>
-        </View>
-
-        <View style={styles.nickSection}>
-          <View style={styles.nickLabelRow}>
-            <Text style={styles.nickLabel}>닉네임</Text>
-            <Text style={[styles.nickCount, randomExhausted && { color: "#E55B4B" }]}>
-              랜덤 {randomCount} / {MAX_RANDOM}
+            <Text style={[styles.avatarHint, randomExhausted && styles.avatarHintWarn]}>
+              {randomExhausted
+                ? "랜덤 시도 횟수를 모두 사용했어요"
+                : `✨ 랜덤 남은 횟수 ${MAX_RANDOM - randomCount}번`}
             </Text>
           </View>
 
-          <View style={[
-            styles.nickInputWrap,
-            nickStatus === "duplicate" && styles.nickInputDuplicate,
-            nickStatus === "editing"   && styles.nickInputEditing,
-            nickStatus === "ok"        && styles.nickInputOk,
-          ]}>
-            <TextInput
-              style={styles.nickInput}
-              value={nick}
-              onChangeText={handleNickChange}
-              placeholder="닉네임을 입력하세요"
-              placeholderTextColor="#AAAAAA"
-              maxLength={30}
-              returnKeyType="done"
-            />
-            {nickStatus === "loading" ? (
-              <ActivityIndicator size="small" color="#FF7325" style={{ marginRight: 12 }} />
-            ) : nickStatus === "ok" ? (
-              <TouchableOpacity
-                style={[styles.randSmallBtn, randomExhausted && styles.randSmallBtnDisabled]}
-                onPress={handleRandom}
-                disabled={randomExhausted || issueMutation.isPending}
-              >
-                <Text style={styles.randSmallIcon}>↻</Text>
-                <Text style={styles.randSmallText}>{randomExhausted ? "소진" : "랜덤"}</Text>
-              </TouchableOpacity>
+          <View style={styles.nickSection}>
+            <View style={styles.nickLabelRow}>
+              <Text style={styles.nickLabel}>닉네임</Text>
+              <Text style={[styles.nickCount, randomExhausted && { color: "#E55B4B" }]}>
+                랜덤 {randomCount} / {MAX_RANDOM}
+              </Text>
+            </View>
+
+            <View style={[
+              styles.nickInputWrap,
+              nickStatus === "duplicate" && styles.nickInputDuplicate,
+              nickStatus === "editing"   && styles.nickInputEditing,
+              nickStatus === "ok"        && styles.nickInputOk,
+            ]}>
+              <TextInput
+                style={styles.nickInput}
+                value={nick}
+                onChangeText={handleNickChange}
+                placeholder="닉네임을 입력하세요"
+                placeholderTextColor="#AAAAAA"
+                maxLength={30}
+                returnKeyType="done"
+              />
+              {nickStatus === "loading" ? (
+                <ActivityIndicator size="small" color="#FF7325" style={{ marginRight: 12 }} />
+              ) : nickStatus === "ok" ? (
+                <TouchableOpacity
+                  style={[styles.randSmallBtn, randomExhausted && styles.randSmallBtnDisabled]}
+                  onPress={handleRandom}
+                  disabled={randomExhausted || issueMutation.isPending}
+                >
+                  <Text style={styles.randSmallIcon}>↻</Text>
+                  <Text style={styles.randSmallText}>{randomExhausted ? "소진" : "랜덤"}</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={styles.checkBtn} onPress={handleCheckDuplicate}>
+                  <Text style={styles.checkBtnText}>{nickStatus === "error" ? "재시도" : "중복 확인"}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View style={styles.statusRow}>
+              {status.icon}
+              <Text style={[styles.statusMsg, { color: status.color }]}>{status.msg}</Text>
+            </View>
+          </View>
+        </ScrollView>
+
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[styles.startBtn, (!canSubmit || isSubmitting) && styles.startBtnDisabled]}
+            onPress={handleSubmit}
+            disabled={!canSubmit || isSubmitting}
+            activeOpacity={0.85}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <TouchableOpacity style={styles.checkBtn} onPress={handleCheckDuplicate}>
-                <Text style={styles.checkBtnText}>{nickStatus === "error" ? "재시도" : "중복 확인"}</Text>
-              </TouchableOpacity>
+              <Text style={styles.startBtnText}>이 프로필로 시작하기</Text>
             )}
-          </View>
-
-          <View style={styles.statusRow}>
-            {status.icon}
-            <Text style={[styles.statusMsg, { color: status.color }]}>{status.msg}</Text>
-          </View>
+          </TouchableOpacity>
         </View>
-      </ScrollView>
-
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.startBtn, (!canSubmit || isSubmitting) && styles.startBtnDisabled]}
-          onPress={handleSubmit}
-          disabled={!canSubmit || isSubmitting}
-          activeOpacity={0.85}
-        >
-          {isSubmitting ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={styles.startBtnText}>이 프로필로 시작하기</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

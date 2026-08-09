@@ -9,6 +9,8 @@ import {
   TextInput,
   BackHandler,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
@@ -244,7 +246,10 @@ function CounterDetail({
 
       {/* 저장 모달 */}
       <Modal visible={saveModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
             <View style={styles.modalIconWrap}>
@@ -277,7 +282,7 @@ function CounterDetail({
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -404,7 +409,10 @@ export default function CounterScreen() {
       />
 
       <Modal visible={newModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>새 프로젝트</Text>
@@ -436,7 +444,7 @@ export default function CounterScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );

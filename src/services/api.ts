@@ -119,6 +119,7 @@ function normalizePost(raw: any): Post {
         }
       : null,
     commentCount: raw.commentCount ?? 0,
+    viewCount: raw.viewCount,
     likedByMe: raw.likedByMe ?? raw.isLiked ?? false,
     media: normalizeMedia(raw),
   };

@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Image,
+  useWindowDimensions,
 } from "react-native";
 import { useScreenshotProtection } from "../hooks/useScreenshotProtection";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -16,10 +17,11 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
 import { usePosts, useToggleLike } from "../hooks/usePosts";
 import { Post } from "../store/postStore";
-import { categoriesApi, challengesApi } from "../services/api";
+import { categoriesApi, challengesApi, Challenge } from "../services/api";
 import { CommunityStackParamList } from "../types/navigation";
 
 type NavigationProp = NativeStackNavigationProp<CommunityStackParamList>;
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "https://api.hamddu.online";
 
 function getTimeAgo(dateStr: string): string {
   const diffMs = Date.now() - new Date(dateStr).getTime();
@@ -43,6 +45,44 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").trim();
 }
 
+function normalizeImageUrl(url?: string | null): string | null {
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  return `${API_BASE_URL}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+
+function ChallengeGridItem({
+  item,
+  size,
+  onPress,
+}: {
+  item: Challenge;
+  size: number;
+  onPress: () => void;
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const imageUrl = normalizeImageUrl(item.imageUrl);
+
+  return (
+    <TouchableOpacity
+      style={[styles.certCard, { width: size, height: size }]}
+      onPress={onPress}
+      activeOpacity={0.85}
+    >
+      {imageUrl && !imageFailed ? (
+        <Image
+          source={{ uri: imageUrl }}
+          style={styles.certImgImage}
+          resizeMode="cover"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        <Text style={styles.certImgText}>사진 없음</Text>
+      )}
+    </TouchableOpacity>
+  );
+}
+
 function PostListItem({
   post,
   onPress,
@@ -59,27 +99,31 @@ function PostListItem({
 
   return (
     <TouchableOpacity
-      style={styles.postItem}
+      style={[styles.postItem, !thumbUrl && styles.postItemTextOnly]}
       onPress={onPress}
       activeOpacity={0.8}
     >
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>{avatarText}</Text>
-      </View>
-      <View style={styles.postBodyArea}>
-        <View style={styles.postBodyContent}>
-          <View style={styles.postAuthorRow}>
+      <View style={styles.postTopRow}>
+        <View style={styles.postAuthorLeft}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{avatarText}</Text>
+          </View>
+          <View style={styles.postAuthorMeta}>
             <Text style={styles.postAuthor} numberOfLines={1}>
               {post.author?.nickname ?? "익명"}
             </Text>
-            <Text style={styles.postDot}>·</Text>
             <Text style={styles.postTime}>{getTimeAgo(post.createdAt)}</Text>
           </View>
-          {catName ? (
-            <View style={styles.postCatChip}>
-              <Text style={styles.postCatText}>{catName}</Text>
-            </View>
-          ) : null}
+        </View>
+        {catName ? (
+          <View style={styles.postCatChip}>
+            <Text style={styles.postCatText}>{catName}</Text>
+          </View>
+        ) : null}
+      </View>
+
+      <View style={styles.postBodyArea}>
+        <View style={styles.postBodyContent}>
           <Text style={styles.postTitle} numberOfLines={1}>
             {post.title}
           </Text>
@@ -88,7 +132,7 @@ function PostListItem({
           </Text>
           <View style={styles.postFooterRow}>
             <View style={styles.postFooterActions}>
-              <TouchableOpacity style={styles.postAction} onPress={onLike}>
+              <TouchableOpacity style={styles.postAction} onPress={onLike} activeOpacity={0.7}>
                 <Text
                   style={[
                     styles.postActionIcon,
@@ -131,31 +175,46 @@ export default function CommunityScreen() {
   const [tab, setTab] = useState<Tab>("post");
   const [cat, setCat] = useState("all");
   const selectedCategoryId = cat === "all" ? undefined : cat;
-  const { data: posts = [], isLoading } = usePosts(selectedCategoryId);
+  const {
+    data: posts = [],
+    isLoading,
+    isError: postsError,
+    refetch: refetchPosts,
+  } = usePosts(selectedCategoryId);
   const { data: categories = [] } = useQuery({
     queryKey: ["categories"],
     queryFn: categoriesApi.getCategories,
   });
-  const { data: challenges = [], isLoading: challengesLoading } = useQuery({
+  const {
+    data: challenges = [],
+    isLoading: challengesLoading,
+    isError: challengesError,
+    refetch: refetchChallenges,
+  } = useQuery({
     queryKey: ["challenges"],
     queryFn: challengesApi.getChallenges,
   });
   const { toggle: toggleLike } = useToggleLike();
   const categoryTabs = [{ id: "all", label: "전체" }, ...categories];
+  const { width } = useWindowDimensions();
+  const certTileSize = Math.floor((width - 40 - 2) / 3);
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* 상단 헤더 */}
       <View style={styles.header}>
-        <Text style={styles.screenTitle}>커뮤니티</Text>
+        <View>
+          <Text style={styles.screenTitle}>커뮤니티</Text>
+          <Text style={styles.screenSubTitle}>
+            뜨개 이야기를 모아보는 공간
+          </Text>
+        </View>
       </View>
 
-      {/* 일반 / 인증 탭 */}
       <View style={styles.tabRow}>
         {(["post", "cert"] as Tab[]).map((t) => (
           <TouchableOpacity
             key={t}
-            style={styles.tabBtn}
+            style={[styles.tabBtn, tab === t && styles.tabBtnActive]}
             onPress={() => setTab(t)}
             activeOpacity={0.7}
           >
@@ -164,7 +223,6 @@ export default function CommunityScreen() {
             >
               {t === "post" ? "일반 게시글" : "인증 게시글"}
             </Text>
-            {tab === t && <View style={styles.tabUnderline} />}
           </TouchableOpacity>
         ))}
       </View>
@@ -175,11 +233,20 @@ export default function CommunityScreen() {
             <View style={styles.center}>
               <ActivityIndicator size="large" color={PRIMARY} />
             </View>
+          ) : postsError ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateTitle}>게시글을 불러오지 못했어요</Text>
+              <Text style={styles.emptyStateText}>잠시 후 다시 시도해주세요</Text>
+              <TouchableOpacity style={styles.retryButton} onPress={() => refetchPosts()} activeOpacity={0.75}>
+                <Text style={styles.retryButtonText}>다시 시도</Text>
+              </TouchableOpacity>
+            </View>
           ) : (
             <FlatList
               data={posts}
               keyExtractor={(item) => item.id}
               style={{ flex: 1 }}
+              contentContainerStyle={styles.postListContent}
               ListHeaderComponent={
                 <ScrollView
                   horizontal
@@ -199,6 +266,12 @@ export default function CommunityScreen() {
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
+              }
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyStateTitle}>아직 게시글이 없어요</Text>
+                  <Text style={styles.emptyStateText}>첫 뜨개 이야기를 남겨보세요</Text>
+                </View>
               }
               renderItem={({ item }) => (
                 <PostListItem
@@ -225,40 +298,39 @@ export default function CommunityScreen() {
         <View style={styles.center}>
           <ActivityIndicator size="large" color={PRIMARY} />
         </View>
+      ) : challengesError ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyStateTitle}>인증 게시글을 불러오지 못했어요</Text>
+          <Text style={styles.emptyStateText}>잠시 후 다시 시도해주세요</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => refetchChallenges()} activeOpacity={0.75}>
+            <Text style={styles.retryButtonText}>다시 시도</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <FlatList
           data={challenges}
           keyExtractor={(item) => item.id}
-          numColumns={2}
+          numColumns={3}
           columnWrapperStyle={styles.certRow}
           contentContainerStyle={styles.certContent}
           ListHeaderComponent={
-            <Text style={styles.certNote}>튜토리얼 인증</Text>
+            <View style={styles.certHeader}>
+              <Text style={styles.certTitle}>튜토리얼 인증</Text>
+              <Text style={styles.certNote}>완성한 순간들을 모아봤어요</Text>
+            </View>
           }
           ListEmptyComponent={
-            <Text style={styles.certNote}>아직 인증 게시글이 없어요</Text>
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateTitle}>아직 인증 게시글이 없어요</Text>
+              <Text style={styles.emptyStateText}>튜토리얼을 완료하면 여기에 모여요</Text>
+            </View>
           }
           renderItem={({ item }) => (
-            <View style={styles.certCard}>
-              <View style={styles.certImg}>
-                {item.imageUrl ? (
-                  <Image source={{ uri: item.imageUrl }} style={styles.certImgImage} resizeMode="cover" />
-                ) : (
-                  <Text style={styles.certImgText}>인증 사진</Text>
-                )}
-              </View>
-              <View style={styles.certInfo}>
-                <Text style={styles.certTut}>
-                  {item.content?.name ?? "튜토리얼"}
-                </Text>
-                <Text style={styles.certName}>
-                  {item.author?.nickname ?? "익명"}
-                </Text>
-                <Text style={styles.certTime}>
-                  {getTimeAgo(item.createdAt)}
-                </Text>
-              </View>
-            </View>
+            <ChallengeGridItem
+              item={item}
+              size={certTileSize}
+              onPress={() => navigation.navigate("ChallengeDetail", { challengeId: item.id })}
+            />
           )}
         />
       )}
@@ -273,152 +345,186 @@ const INK2 = "#404040";
 const INK3 = "#8A8A8A";
 const LINE = "#ECECEC";
 const PRIMARY_DEEP = "#C7521A";
+const SURFACE = "#F7F5F2";
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FFFFFF" },
   header: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 6,
+    paddingTop: 10,
+    paddingBottom: 14,
   },
   screenTitle: {
-    flex: 1,
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "800",
     color: INK1,
-    letterSpacing: -0.4,
+    lineHeight: 30,
+  },
+  screenSubTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: INK3,
+    marginTop: 2,
   },
   tabRow: {
     flexDirection: "row",
     paddingHorizontal: 20,
-    gap: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: LINE,
-    backgroundColor: "#fff",
+    paddingVertical: 4,
+    marginHorizontal: 20,
+    marginBottom: 8,
+    gap: 4,
+    borderRadius: 999,
+    backgroundColor: SURFACE,
   },
   tabBtn: {
-    paddingVertical: 12,
-    position: "relative",
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tabBtnActive: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: LINE,
   },
   tabBtnText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
     color: INK3,
   },
   tabBtnTextActive: {
     fontWeight: "800",
     color: INK1,
   },
-  tabUnderline: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: -1,
-    height: 2.5,
-    backgroundColor: PRIMARY,
-    borderRadius: 2,
-  },
   catContent: {
     paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 0,
+    paddingTop: 6,
+    paddingBottom: 10,
     gap: 6,
   },
   catChip: {
-    height: 32,
+    height: 34,
     paddingHorizontal: 13,
     borderRadius: 999,
-    backgroundColor: "#F2F2F2",
+    backgroundColor: SURFACE,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "transparent",
   },
   catChipActive: {
-    backgroundColor: INK1,
+    backgroundColor: "#fff",
+    borderColor: PRIMARY,
   },
   catChipText: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "700",
     color: INK2,
-    whiteSpace: "nowrap",
-  } as any,
+  },
   catChipTextActive: {
-    color: "#fff",
+    color: PRIMARY,
     fontWeight: "800",
   },
   postSection: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  postListContent: {
+    paddingBottom: 104,
+  },
 
   postItem: {
-    flexDirection: "row",
     backgroundColor: "#fff",
-    padding: 16,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: LINE,
+    marginHorizontal: 20,
+    marginBottom: 10,
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: LINE,
+  },
+  postItemTextOnly: {
+    backgroundColor: "#fff",
+  },
+  postTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    marginBottom: 12,
+  },
+  postAuthorLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    minWidth: 0,
   },
   avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: PRIMARY_SOFT,
     alignItems: "center",
     justifyContent: "center",
   },
   avatarText: { fontSize: 12, fontWeight: "800", color: PRIMARY_DEEP },
-  postBodyArea: {
+  postAuthorMeta: {
+    marginLeft: 9,
     flex: 1,
-    marginLeft: 10,
+    minWidth: 0,
+  },
+  postBodyArea: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
   },
   postBodyContent: {
     flex: 1,
     minWidth: 0,
   },
-  postAuthorRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    marginBottom: 3,
-  },
-  postAuthor: { fontSize: 13, fontWeight: "700", color: INK1 },
-  postDot: { fontSize: 11, color: INK3 },
-  postTime: { fontSize: 11, color: INK3 },
+  postAuthor: { fontSize: 13, fontWeight: "800", color: INK1 },
+  postTime: { fontSize: 11, color: INK3, fontWeight: "600", marginTop: 1 },
   postCatChip: {
-    alignSelf: "flex-start",
-    marginBottom: 5,
+    minHeight: 28,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    backgroundColor: PRIMARY_SOFT,
+    alignItems: "center",
+    justifyContent: "center",
   },
   postCatText: {
     fontSize: 11,
-    fontWeight: "700",
-    color: PRIMARY,
+    fontWeight: "800",
+    color: PRIMARY_DEEP,
   },
   postTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "800",
     color: INK1,
-    letterSpacing: -0.2,
+    lineHeight: 22,
     marginBottom: 4,
   },
-  postBody: { fontSize: 13, color: INK2, lineHeight: 19.5, marginBottom: 6 },
+  postBody: { fontSize: 13, color: INK2, lineHeight: 20, marginBottom: 10 },
   postFooterRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
   postFooterActions: { flexDirection: "row", gap: 14 },
-  postAction: { flexDirection: "row", alignItems: "center", gap: 4 },
+  postAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    minHeight: 24,
+  },
   postActionIcon: { fontSize: 13, color: INK3 },
   postActionText: { fontSize: 12, color: INK3, fontWeight: "600" },
   postThumbWrap: {
-    width: 76,
-    height: 76,
-    borderRadius: 10,
-    backgroundColor: "#F2F2F2",
+    width: 96,
+    height: 96,
+    borderRadius: 16,
+    backgroundColor: SURFACE,
     marginLeft: 12,
-    alignSelf: "center",
     overflow: "hidden",
   },
   postThumb: {
@@ -459,42 +565,62 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   fabText: { color: "#fff", fontSize: 26, fontWeight: "800", lineHeight: 28 },
-  certContent: { padding: 20 },
-  certRow: { gap: 10, marginBottom: 10 },
+  certContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 104 },
+  certRow: { gap: 1, marginBottom: 1 },
+  certHeader: {
+    marginBottom: 12,
+  },
+  certTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: INK1,
+  },
   certNote: {
-    fontSize: 11,
+    fontSize: 12,
     color: INK3,
-    fontWeight: "700",
-    marginBottom: 10,
-    letterSpacing: 0.4,
+    fontWeight: "600",
+    marginTop: 2,
   },
   certCard: {
-    flex: 1,
-    backgroundColor: "#fff",
-    borderRadius: 14,
+    backgroundColor: SURFACE,
     overflow: "hidden",
-    borderWidth: 1,
-    borderColor: LINE,
-  },
-  certImg: {
-    height: 130,
-    backgroundColor: "#F2F2F2",
     alignItems: "center",
     justifyContent: "center",
-    overflow: "hidden",
   },
   certImgImage: {
     width: "100%",
     height: "100%",
   },
-  certImgText: { fontSize: 11, color: INK3 },
-  certInfo: { padding: 10 },
-  certTut: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: PRIMARY,
-    letterSpacing: 0.3,
+  certImgText: { fontSize: 11, color: INK3, fontWeight: "700" },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 56,
+    paddingHorizontal: 20,
   },
-  certName: { fontSize: 12, fontWeight: "700", color: INK1, marginTop: 2 },
-  certTime: { fontSize: 10, color: INK3, marginTop: 2 },
+  emptyStateTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: INK1,
+  },
+  emptyStateText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: INK3,
+    marginTop: 5,
+  },
+  retryButton: {
+    minHeight: 36,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: PRIMARY,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 14,
+  },
+  retryButtonText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#fff",
+  },
 });

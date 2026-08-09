@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
-import { Animated, Vibration } from "react-native";
-import { NavigationContainer } from "@react-navigation/native";
+import { Animated, Text, TouchableOpacity, Vibration } from "react-native";
+import { NavigationContainer, getFocusedRouteNameFromRoute } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Provider as PaperProvider } from "react-native-paper";
@@ -21,6 +21,7 @@ import CounterScreen from "./src/screens/CounterScreen";
 import CommunityScreen from "./src/screens/CommunityScreen";
 import ProfileScreen from "./src/screens/ProfileScreen";
 import PostDetailScreen from "./src/screens/PostDetailScreen";
+import ChallengeDetailScreen from "./src/screens/ChallengeDetailScreen";
 import AddPostScreen from "./src/screens/AddPostScreen";
 import LoginScreen from "./src/screens/LoginScreen";
 import SurveyScreen from "./src/screens/SurveyScreen";
@@ -40,6 +41,18 @@ const PRIMARY = "#FF7325";
 const CREAM = "#FFF8F2";
 const CREAM_LINE = "#EFE6DF";
 const INK3 = "#8A8A8A";
+const WHITE = "#FFFFFF";
+const WHITE_LINE = "#ECECEC";
+const BASE_TAB_BAR_STYLE = {
+  elevation: 8,
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: -2 },
+  shadowOpacity: 0.06,
+  shadowRadius: 8,
+  height: 70,
+  paddingTop: 8,
+  paddingBottom: 8,
+} as const;
 
 function TabIcon({
   focused,
@@ -103,9 +116,31 @@ function HomeStackNavigator() {
   );
 }
 
+function HeaderBackButton({ onPress }: { onPress: () => void }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+      accessibilityRole="button"
+      accessibilityLabel="뒤로가기"
+      style={{ width: 36, height: 36, justifyContent: "center" }}
+    >
+      <Text style={{ color: "#1A1A1A", fontSize: 30, lineHeight: 34 }}>‹</Text>
+    </TouchableOpacity>
+  );
+}
+
 function CommunityStackNavigator() {
   return (
-    <CommunityStack.Navigator>
+    <CommunityStack.Navigator
+      screenOptions={({ navigation }) => ({
+        headerBackVisible: false,
+        headerLeft: () => <HeaderBackButton onPress={navigation.goBack} />,
+        headerStyle: { backgroundColor: "#fff" },
+        headerTintColor: "#1A1A1A",
+        headerTitleStyle: { fontWeight: "800" },
+      })}
+    >
       <CommunityStack.Screen
         name="CommunityFeed"
         component={CommunityScreen}
@@ -114,12 +149,17 @@ function CommunityStackNavigator() {
       <CommunityStack.Screen
         name="PostDetail"
         component={PostDetailScreen}
-        options={{ headerTitle: "게시물", headerStyle: { backgroundColor: "#fff" }, headerTintColor: "#1A1A1A", headerTitleStyle: { fontWeight: "800" } }}
+        options={{ headerTitle: "게시물" }}
+      />
+      <CommunityStack.Screen
+        name="ChallengeDetail"
+        component={ChallengeDetailScreen}
+        options={{ headerTitle: "인증 게시글" }}
       />
       <CommunityStack.Screen
         name="AddPost"
         component={AddPostScreen}
-        options={{ headerTitle: "작품 등록", headerStyle: { backgroundColor: "#fff" }, headerTintColor: "#1A1A1A", headerTitleStyle: { fontWeight: "800" } }}
+        options={{ headerTitle: "작품 등록" }}
       />
     </CommunityStack.Navigator>
   );
@@ -128,28 +168,30 @@ function CommunityStackNavigator() {
 function MainTabs() {
   return (
     <Tab.Navigator
-      screenOptions={{
+      screenOptions={({ route }) => {
+        const focusedRouteName = getFocusedRouteNameFromRoute(route);
+        const isHomeMain =
+          route.name === "Home" &&
+          (!focusedRouteName || focusedRouteName === "TutorialList");
+        const tabBackgroundColor = isHomeMain ? CREAM : WHITE;
+
+        return {
         tabBarActiveTintColor: PRIMARY,
         tabBarInactiveTintColor: INK3,
         tabBarStyle: {
-          backgroundColor: CREAM,
+          ...BASE_TAB_BAR_STYLE,
+          backgroundColor: tabBackgroundColor,
           borderTopWidth: 1,
-          borderTopColor: CREAM_LINE,
-          elevation: 8,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.06,
-          shadowRadius: 8,
-          height: 70,
-          paddingTop: 8,
-          paddingBottom: 8,
+          borderTopColor: isHomeMain ? CREAM_LINE : WHITE_LINE,
         },
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: "600",
           marginBottom: 0,
         },
+        tabBarHideOnKeyboard: true,
         headerShown: false,
+      };
       }}
       screenListeners={{
         tabPress: () => Vibration.vibrate(10),

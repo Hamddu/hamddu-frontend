@@ -13,9 +13,10 @@ import {
   Alert,
   Share,
 } from "react-native";
-import { Text, TextInput, Button, Avatar, Dialog, Portal, RadioButton } from "react-native-paper";
+import { Text, TextInput, Button, Dialog, Portal, RadioButton } from "react-native-paper";
 import RenderHtml from "react-native-render-html";
 import { useRoute } from "@react-navigation/native";
+import { useHeaderHeight } from "@react-navigation/elements";
 import type { RouteProp } from "@react-navigation/native";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import axios from "axios";
@@ -34,6 +35,7 @@ const INK2 = "#404040";
 const INK3 = "#8A8A8A";
 const LINE = "#ECECEC";
 const WHITE = "#FFFFFF";
+const SURFACE = "#F7F5F2";
 
 type PostDetailRouteProp = RouteProp<CommunityStackParamList, "PostDetail">;
 type ReportTarget = { type: "post"; id: string } | { type: "comment"; id: string };
@@ -71,9 +73,15 @@ function getApiErrorMessage(error: unknown): string {
 export default function PostDetailScreen() {
   const route = useRoute<PostDetailRouteProp>();
   const { postId } = route.params;
+  const headerHeight = useHeaderHeight();
 
-  const { data: post, isLoading: postLoading } = usePost(postId);
-  const { data: comments, isLoading: commentsLoading } = useComments(postId);
+  const { data: post, isLoading: postLoading, isError: postError, refetch: refetchPost } = usePost(postId);
+  const {
+    data: comments,
+    isLoading: commentsLoading,
+    isError: commentsError,
+    refetch: refetchComments,
+  } = useComments(postId);
   const { data: myProfile } = useQuery({ queryKey: ["profile", "me"], queryFn: getMyProfile });
   const { toggle: toggleLike } = useToggleLike();
   const addCommentMutation = useAddComment();
@@ -162,126 +170,134 @@ export default function PostDetailScreen() {
     );
   }
 
+  if (postError) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.errorTitle}>게시물을 불러오지 못했어요</Text>
+        <Text style={styles.errorText}>잠시 후 다시 시도해주세요</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={() => refetchPost()} activeOpacity={0.75}>
+          <Text style={styles.retryButtonText}>다시 시도</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   if (!post) {
     return (
       <View style={styles.centerContainer}>
-        <Text style={styles.errorText}>게시물을 찾을 수 없습니다.</Text>
+        <Text style={styles.errorTitle}>게시물을 찾을 수 없어요</Text>
+        <Text style={styles.errorText}>삭제되었거나 접근할 수 없는 게시글이에요</Text>
       </View>
     );
   }
 
   const categoryName = post.category?.name ?? "";
   const authorName = post.author?.nickname ?? "익명";
+  const avatarText = authorName.slice(0, 2);
   const media = (post as any).media ?? [];
   const tags = (post as any).tags ?? [];
+  const authorMeta = [
+    getTimeAgo(post.createdAt),
+    typeof post.viewCount === "number" ? `조회 ${post.viewCount}` : null,
+  ].filter(Boolean).join(" · ");
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
-      keyboardVerticalOffset={90}
+      keyboardVerticalOffset={headerHeight}
     >
-      <ScrollView style={styles.scrollView}>
-        {/* 카테고리 */}
-        {categoryName ? (
-          <View style={styles.categorySection}>
-            <Text style={styles.categoryLabel}>{categoryName}</Text>
-          </View>
-        ) : null}
-
-        {/* 작성자 영역 */}
-        <View style={styles.authorSection}>
-          <View style={styles.authorLeft}>
-            <Avatar.Icon
-              size={40}
-              icon="account"
-              style={styles.avatar}
-              color={WHITE}
-            />
-            <View style={styles.authorInfo}>
-              <View style={styles.authorNameRow}>
-                <Text style={styles.authorName}>{authorName}</Text>
-                <View style={styles.levelBadge}>
-                  <Text style={styles.levelText}>Lv.7</Text>
-                </View>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.articleCard}>
+          <View style={styles.authorSection}>
+            <View style={styles.authorLeft}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{avatarText}</Text>
               </View>
-              <Text style={styles.authorMeta}>{getTimeAgo(post.createdAt)} · 조회 {(post as any).viewCount ?? 132}</Text>
+              <View style={styles.authorInfo}>
+                <Text style={styles.authorName} numberOfLines={1}>{authorName}</Text>
+                <Text style={styles.authorMeta}>{authorMeta}</Text>
+              </View>
             </View>
+            <TouchableOpacity style={styles.headerReportBtn} onPress={() => openReportDialog({ type: "post", id: post.id })}>
+              <Text style={styles.headerReportText}>신고</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.headerReportBtn} onPress={() => openReportDialog({ type: "post", id: post.id })}>
-            <Text style={styles.headerReportText}>신고</Text>
-          </TouchableOpacity>
-        </View>
 
-        {/* 게시글 본문 영역 */}
-        <View style={styles.bodySection}>
-          <Text style={styles.categoryChip}>{categoryName}</Text>
-          <Text style={styles.postTitle}>{post.title}</Text>
-          <RenderHtml
-            contentWidth={contentWidth - 40}
-            source={{ html: post.body }}
-            baseStyle={styles.htmlBody}
-          />
+          <View style={styles.bodySection}>
+            {categoryName ? (
+              <Text style={styles.categoryChip}>{categoryName}</Text>
+            ) : null}
+            <Text style={styles.postTitle}>{post.title}</Text>
+            <RenderHtml
+              contentWidth={contentWidth - 40}
+              source={{ html: post.body }}
+              baseStyle={styles.htmlBody}
+            />
 
-          {/* 태그 */}
-          {tags.length > 0 && (
-            <View style={styles.tagsRow}>
-              {tags.map((tag: string, i: number) => (
-                <Text key={i} style={styles.tagText}>#{tag}</Text>
+            {tags.length > 0 && (
+              <View style={styles.tagsRow}>
+                {tags.map((tag: string, i: number) => (
+                  <Text key={i} style={styles.tagText}>#{tag}</Text>
+                ))}
+              </View>
+            )}
+          </View>
+
+          {media.length > 0 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.mediaContent}
+            >
+              {media.map((m: any, i: number) => (
+                <Image
+                  key={m.url ?? i}
+                  source={{ uri: m.url ?? m }}
+                  style={styles.mediaImage}
+                  resizeMode="cover"
+                />
               ))}
-            </View>
+            </ScrollView>
           )}
-        </View>
 
-        {/* 미디어 이미지 */}
-        {media.length > 0 && (
-          <ScrollView
-            horizontal
-            style={styles.mediaScroll}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.mediaContent}
-          >
-            {media.map((m: any, i: number) => (
-              <Image
-                key={m.url ?? i}
-                source={{ uri: m.url ?? m }}
-                style={styles.mediaImage}
-                resizeMode="cover"
-              />
-            ))}
-          </ScrollView>
-        )}
-
-        {/* 액션 바 */}
-        <View style={styles.actionBar}>
-          <TouchableOpacity onPress={handleLikePress} style={styles.actionBtn}>
-            <Text style={[styles.actionIcon, post.likedByMe && { color: PRIMARY }]}>
-              {post.likedByMe ? "♥" : "♡"}
-            </Text>
-            <Text style={styles.actionCount}>{post.likeCount}</Text>
-          </TouchableOpacity>
-          <View style={styles.actionBtn}>
-            <Text style={styles.actionIcon}>💬</Text>
-            <Text style={styles.actionCount}>{post.commentCount}</Text>
+          <View style={styles.actionBar}>
+            <TouchableOpacity onPress={handleLikePress} style={styles.actionBtn} activeOpacity={0.75}>
+              <Text style={[styles.actionIcon, post.likedByMe && { color: PRIMARY }]}>
+                {post.likedByMe ? "♥" : "♡"}
+              </Text>
+              <Text style={styles.actionCount}>{post.likeCount}</Text>
+            </TouchableOpacity>
+            <View style={styles.actionBtn}>
+              <Text style={styles.actionIcon}>💬</Text>
+              <Text style={styles.actionCount}>{post.commentCount}</Text>
+            </View>
+            <TouchableOpacity style={styles.actionBtn} onPress={handleShare} activeOpacity={0.75}>
+              <Text style={styles.actionLabel}>공유</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
-            <Text style={styles.actionIcon}>⋮</Text>
-            <Text style={styles.actionLabel}>공유</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => openReportDialog({ type: "post", id: post.id })}>
-            <Text style={styles.actionIcon}>!</Text>
-            <Text style={styles.actionLabel}>신고</Text>
-          </TouchableOpacity>
         </View>
 
-        {/* 댓글 섹션 */}
         <View style={styles.commentsSection}>
-          <Text style={styles.commentsTitle}>
-            댓글 {comments?.length || 0}
-          </Text>
+          <View style={styles.commentsHeader}>
+            <Text style={styles.commentsTitle}>댓글</Text>
+            <Text style={styles.commentsCount}>{comments?.length || 0}</Text>
+          </View>
 
           {commentsLoading ? (
             <ActivityIndicator size="small" color={PRIMARY} />
+          ) : commentsError ? (
+            <View style={styles.commentErrorBox}>
+              <Text style={styles.errorTitle}>댓글을 불러오지 못했어요</Text>
+              <Text style={styles.errorText}>잠시 후 다시 시도해주세요</Text>
+              <TouchableOpacity style={styles.retryButton} onPress={() => refetchComments()} activeOpacity={0.75}>
+                <Text style={styles.retryButtonText}>다시 시도</Text>
+              </TouchableOpacity>
+            </View>
           ) : comments && comments.length > 0 ? (
             <FlatList
               data={comments}
@@ -304,9 +320,7 @@ export default function PostDetailScreen() {
               scrollEnabled={false}
             />
           ) : (
-            <Text style={styles.noComments}>
-              첫 댓글을 남겨보세요!
-            </Text>
+            <Text style={styles.noComments}>첫 댓글을 남겨보세요</Text>
           )}
         </View>
       </ScrollView>
@@ -405,27 +419,50 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: INK3,
-    fontSize: 16,
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 5,
+  },
+  errorTitle: {
+    color: INK1,
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  retryButton: {
+    minHeight: 36,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: PRIMARY,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 14,
+  },
+  retryButtonText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#fff",
   },
   scrollView: {
     flex: 1,
   },
-  categorySection: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 12,
+  scrollContent: {
+    paddingTop: 12,
+    paddingBottom: 112,
   },
-  categoryLabel: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: INK1,
+  articleCard: {
+    backgroundColor: WHITE,
+    marginHorizontal: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: LINE,
+    overflow: "hidden",
   },
   authorSection: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: LINE,
   },
@@ -433,71 +470,77 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     flex: 1,
+    minWidth: 0,
   },
   headerReportBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    minHeight: 32,
+    paddingHorizontal: 11,
+    borderRadius: 16,
+    backgroundColor: SURFACE,
+    alignItems: "center",
+    justifyContent: "center",
   },
   headerReportText: {
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "800",
     color: INK3,
   },
   avatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: PRIMARY_SOFT,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: PRIMARY_DEEP,
   },
   authorInfo: {
     marginLeft: 10,
-  },
-  authorNameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
+    flex: 1,
+    minWidth: 0,
   },
   authorName: {
     fontSize: 14,
     fontWeight: "800",
     color: INK1,
   },
-  levelBadge: {
-    backgroundColor: PRIMARY_SOFT,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 4,
-  },
-  levelText: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: PRIMARY,
-  },
   authorMeta: {
     fontSize: 11,
-    fontWeight: "400",
+    fontWeight: "600",
     color: INK3,
     marginTop: 1,
   },
   bodySection: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 14,
     paddingTop: 16,
-    paddingBottom: 12,
+    paddingBottom: 14,
   },
   categoryChip: {
+    alignSelf: "flex-start",
     fontSize: 11,
-    fontWeight: "700",
-    color: PRIMARY,
-    marginBottom: 6,
+    fontWeight: "800",
+    color: PRIMARY_DEEP,
+    backgroundColor: PRIMARY_SOFT,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginBottom: 10,
   },
   postTitle: {
     fontSize: 21,
     fontWeight: "800",
     color: INK1,
-    lineHeight: 27.3,
+    lineHeight: 28,
     marginBottom: 10,
   },
   htmlBody: {
     color: INK2,
     fontSize: 14,
-    lineHeight: 23.1,
+    lineHeight: 23,
   },
   tagsRow: {
     flexDirection: "row",
@@ -510,32 +553,35 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: PRIMARY_DEEP,
   },
-  mediaScroll: {
-    marginTop: 4,
-  },
   mediaContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 14,
+    paddingBottom: 14,
     gap: 8,
   },
   mediaImage: {
-    width: 268,
-    height: 200,
-    borderRadius: 10,
-    backgroundColor: WHITE,
+    width: 250,
+    height: 188,
+    borderRadius: 14,
+    backgroundColor: SURFACE,
   },
   actionBar: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: LINE,
-    gap: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: LINE,
+    gap: 8,
   },
   actionBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    justifyContent: "center",
+    minHeight: 34,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: SURFACE,
+    gap: 5,
   },
   actionIcon: {
     fontSize: 13,
@@ -548,28 +594,57 @@ const styles = StyleSheet.create({
   },
   actionLabel: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "700",
     color: INK3,
   },
   commentsSection: {
+    marginHorizontal: 20,
+    marginTop: 12,
     paddingTop: 16,
     paddingBottom: 20,
+    borderTopWidth: 1,
+    borderTopColor: LINE,
+  },
+  commentsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 8,
   },
   commentsTitle: {
-    fontSize: 14,
-    fontWeight: "700",
+    fontSize: 16,
+    fontWeight: "800",
     color: INK1,
-    paddingHorizontal: 20,
-    marginBottom: 4,
+  },
+  commentsCount: {
+    minWidth: 24,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: SURFACE,
+    color: INK3,
+    fontSize: 12,
+    fontWeight: "800",
+    textAlign: "center",
+    lineHeight: 22,
   },
   noComments: {
-    fontSize: 14,
+    fontSize: 13,
+    fontWeight: "600",
     color: INK3,
     textAlign: "center",
-    paddingVertical: 32,
+    paddingVertical: 36,
+    backgroundColor: SURFACE,
+    borderRadius: 16,
+  },
+  commentErrorBox: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 28,
+    backgroundColor: SURFACE,
+    borderRadius: 16,
   },
   commentInputContainer: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 10,
     backgroundColor: WHITE,
     borderTopWidth: 1,
@@ -600,7 +675,7 @@ const styles = StyleSheet.create({
   commentInput: {
     flex: 1,
     maxHeight: 100,
-    backgroundColor: WHITE,
+    backgroundColor: SURFACE,
     fontSize: 13,
   },
   submitButton: {
