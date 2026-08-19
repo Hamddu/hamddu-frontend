@@ -18,10 +18,17 @@ export const usePosts = (categoryId?: string) => {
 };
 
 export const usePost = (postId: string) => {
+  const queryClient = useQueryClient();
   return useQuery({
     queryKey: postKeys.detail(postId),
     queryFn: () => postsApi.getPostById(postId),
     enabled: !!postId,
+    initialData: () =>
+      queryClient
+        .getQueriesData<Post[]>({ queryKey: postKeys.lists() })
+        .flatMap(([, posts]) => posts ?? [])
+        .find((post) => post.id === postId),
+    initialDataUpdatedAt: 0,
   });
 };
 
@@ -30,6 +37,17 @@ export const useAddPost = () => {
   return useMutation({
     mutationFn: postsApi.addPost,
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: postKeys.lists() });
+    },
+  });
+};
+
+export const useUpdatePost = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: postsApi.updatePost,
+    onSuccess: (post) => {
+      queryClient.setQueryData(postKeys.detail(post.id), post);
       queryClient.invalidateQueries({ queryKey: postKeys.lists() });
     },
   });

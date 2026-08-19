@@ -3268,6 +3268,11 @@ expo-asset@~55.0.18:
     "@expo/image-utils" "^0.8.15"
     expo-constants "~55.0.17"
 
+expo-blur@~55.0.17:
+  version "55.0.17"
+  resolved "https://registry.yarnpkg.com/expo-blur/-/expo-blur-55.0.17.tgz#f11f052a4758d5fce01cb396f15414757c905c4b"
+  integrity sha512-DMdaiq1aRedf3Dy8YlPQE9aM5AcmstgTFc4UqOZp+Vm0PCD5tgHz1OfSZ5b9o4wpZpPmtyJ047QiBjl8RfQplw==
+
 expo-build-properties@~55.0.16:
   version "55.0.17"
   resolved "https://registry.yarnpkg.com/expo-build-properties/-/expo-build-properties-55.0.17.tgz#64f11dca57f7e0f71a7d8be0d4f97b5113fc3820"
@@ -3339,6 +3344,11 @@ expo-font@~55.0.8:
   integrity sha512-WyP75pnKqhLNktYwDn3xKAUNt5rLihRDv8XWGhhz6VEhVqypixpT86NA3uGtiDTlM3gGjhrYCY7o7ypXgCUOZg==
   dependencies:
     fontfaceobserver "^2.1.0"
+
+expo-glass-effect@~55.0.11:
+  version "55.0.11"
+  resolved "https://registry.yarnpkg.com/expo-glass-effect/-/expo-glass-effect-55.0.11.tgz#23a3ba71e5f740d6ae557f4298f6abdb030da2f8"
+  integrity sha512-wqq7GUOqSkfoFJzreZvBG0jzjsq5c582m3glhWSjcmIuByxXXWp6j6GY6hyFuYKzpOXhbuvusVxGCQi0yWnp3g==
 
 expo-image-loader@~55.0.1:
   version "55.0.1"

@@ -1,32 +1,33 @@
 import React, { useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Image,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import LoginCharacter from "../../assets/login/character.svg";
+import LoginFire from "../../assets/login/fire.svg";
+import NaverIcon from "../../assets/login/naver.svg";
+import YarnBottom from "../../assets/login/yarn-bottom.svg";
+import YarnLeft from "../../assets/login/yarn-left.svg";
+import YarnTop from "../../assets/login/yarn-top.svg";
 import { loginWithOAuth } from "../api/auth.api";
 import { getMyProfile } from "../api/users.api";
 import { useAuthStore } from "../store/authStore";
 
-function GoogleIcon() {
-  return (
-    <Text style={{ fontSize: 18 }}>G</Text>
-  );
-}
-
-function NaverIcon() {
-  return (
-    <Text style={{ fontSize: 16, fontWeight: "900", color: "#fff" }}>N</Text>
-  );
-}
+const GOOGLE_ICON = require("../../assets/login/google.png");
 
 export default function LoginScreen() {
   const [loading, setLoading] = useState<"google" | "naver" | null>(null);
   const { setAccessToken, setSurveyRequired } = useAuthStore();
+  const { width, height } = useWindowDimensions();
+  const scale = Math.min(width / 451, height / 980);
 
   async function handleLogin(provider: "google" | "naver") {
     setLoading(provider);
@@ -46,218 +47,146 @@ export default function LoginScreen() {
     }
   }
 
+  const buttonSize = { height: 60 * scale, borderRadius: 30 * scale };
+
   return (
-    <SafeAreaView style={styles.flex}>
-        {/* 상단: 마스코트 + 로고 + 카피 */}
-        <View style={styles.top}>
-          {/* 마스코트 */}
-          <View style={styles.mascotWrap}>
-            <View style={styles.mascotGlow} />
-            <View style={styles.mascotCircle}>
-              <Text style={styles.mascotEmoji}>🐹</Text>
-            </View>
+    <SafeAreaView style={styles.screen}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFF8F2" />
+
+      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+        <View style={[styles.topYarn, { right: -25 * scale, top: 15 * scale }]}>
+          <YarnTop width={69 * scale} height={253 * scale} />
+        </View>
+        <View style={[styles.leftYarn, { left: -15 * scale, top: height * 0.33 }]}>
+          <YarnLeft width={140 * scale} height={324 * scale} />
+        </View>
+        <View style={[styles.bottomYarn, { right: -10 * scale, bottom: -20 * scale }]}>
+          <YarnBottom width={83 * scale} height={203 * scale} />
+        </View>
+      </View>
+
+      <View style={styles.brandArea}>
+        <View style={{ width: 178 * scale, height: 173 * scale }}>
+          <LoginFire width={178 * scale} height={173 * scale} />
+          <View style={[styles.character, { left: 32 * scale, top: 84 * scale }]}>
+            <LoginCharacter width={102 * scale} height={74 * scale} />
           </View>
-
-          {/* 로고 */}
-          <Text style={styles.logo}>
-            함<Text style={styles.logoAccent}>뜨</Text>
-          </Text>
-
-          {/* 헤드라인 */}
-          <Text style={styles.headline}>
-            한 코, 한 코,{"\n"}
-            <Text style={styles.headlineAccent}>함께 떠요</Text>
-          </Text>
-
-          {/* 서브 */}
-          <Text style={styles.sub}>
-            튜토리얼부터 인증, 카운터까지{"\n"}뜨개에 필요한 모든 것
-          </Text>
         </View>
+        <Text style={[styles.logo, { fontSize: 60 * scale, lineHeight: 72 * scale }]}>함뜨</Text>
+        <Text style={[styles.tagline, { fontSize: 24 * scale, lineHeight: 34 * scale }]}>
+          한 코 한 코 함께 떠볼까요!
+        </Text>
+      </View>
 
-        {/* 하단: 버튼 */}
-        <View style={styles.bottom}>
-          {/* Google */}
-          <TouchableOpacity
-            style={styles.googleBtn}
-            onPress={() => handleLogin("google")}
-            disabled={!!loading}
-            activeOpacity={0.85}
-          >
-            {loading === "google" ? (
-              <ActivityIndicator size="small" color="#3C4043" />
-            ) : (
-              <>
-                <View style={styles.googleIconWrap}>
-                  <Text style={styles.googleIconText}>G</Text>
-                </View>
-                <Text style={styles.googleBtnText}>Google로 계속하기</Text>
-              </>
-            )}
-          </TouchableOpacity>
+      <View style={[styles.actions, { paddingHorizontal: 30 * scale, paddingBottom: 55 * scale, gap: 10 * scale }]}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="구글로 계속하기"
+          activeOpacity={0.82}
+          disabled={!!loading}
+          onPress={() => handleLogin("google")}
+          style={[styles.googleButton, buttonSize]}
+        >
+          {loading === "google" ? (
+            <ActivityIndicator size="small" color="#222222" />
+          ) : (
+            <>
+              <Image
+                source={GOOGLE_ICON}
+                style={[styles.providerIcon, { left: 22 * scale, width: 22 * scale, height: 23 * scale }]}
+              />
+              <Text style={[styles.buttonText, { fontSize: 19 * scale }]}>구글로 계속하기</Text>
+            </>
+          )}
+        </TouchableOpacity>
 
-          {/* Naver */}
-          <TouchableOpacity
-            style={styles.naverBtn}
-            onPress={() => handleLogin("naver")}
-            disabled={!!loading}
-            activeOpacity={0.85}
-          >
-            {loading === "naver" ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <View style={styles.naverIconWrap}>
-                  <Text style={styles.naverIconText}>N</Text>
-                </View>
-                <Text style={styles.naverBtnText}>네이버로 계속하기</Text>
-              </>
-            )}
-          </TouchableOpacity>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="네이버로 계속하기"
+          activeOpacity={0.82}
+          disabled={!!loading}
+          onPress={() => handleLogin("naver")}
+          style={[styles.naverButton, buttonSize]}
+        >
+          {loading === "naver" ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <>
+              <View style={[styles.providerIcon, { left: 22 * scale }]}>
+                <NaverIcon width={19 * scale} height={19 * scale} />
+              </View>
+              <Text style={[styles.buttonText, styles.naverText, { fontSize: 19 * scale }]}>네이버로 계속하기</Text>
+            </>
+          )}
+        </TouchableOpacity>
 
-          {/* 약관 */}
-          <Text style={styles.terms}>
-            가입하면{" "}
-            <Text style={styles.termsLink}>이용약관</Text>과{" "}
-            <Text style={styles.termsLink}>개인정보처리방침</Text>에 동의하게 돼요
-          </Text>
-        </View>
-      </SafeAreaView>
+        <Text style={[styles.terms, { fontSize: 15 * scale, lineHeight: 20 * scale, marginTop: 32 * scale }]}>
+          가입하면 이용약관과 개인정보처리방침에 동의하게 돼요
+        </Text>
+      </View>
+    </SafeAreaView>
   );
 }
 
-const PRIMARY = "#FF7325";
-const INK1 = "#1A1A1A";
-const INK3 = "#8A8A8A";
-
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: "#FFF1E4" },
-  top: {
+  screen: {
+    flex: 1,
+    overflow: "hidden",
+    backgroundColor: "#FFF8F2",
+  },
+  topYarn: {
+    position: "absolute",
+    transform: [{ rotate: "-151.16deg" }],
+  },
+  leftYarn: { position: "absolute" },
+  bottomYarn: { position: "absolute" },
+  brandArea: {
+    zIndex: 1,
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingTop: 20,
   },
-  mascotWrap: {
-    position: "relative",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 20,
-  },
-  mascotGlow: {
-    position: "absolute",
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    backgroundColor: "rgba(255,115,37,0.15)",
-  },
-  mascotCircle: {
-    width: 148,
-    height: 148,
-    borderRadius: 74,
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#ECECEC",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  mascotEmoji: { fontSize: 80 },
+  character: { position: "absolute" },
   logo: {
-    fontSize: 52,
+    marginTop: 16,
+    color: "#FF7326",
     fontWeight: "900",
-    letterSpacing: -2.6,
-    color: INK1,
-    lineHeight: 56,
-    marginBottom: 16,
+    letterSpacing: -2.4,
+    textAlign: "center",
   },
-  logoAccent: { color: PRIMARY },
-  headline: {
-    fontSize: 22,
+  tagline: {
+    color: "#A55428",
     fontWeight: "700",
-    color: INK1,
+    letterSpacing: -0.7,
     textAlign: "center",
-    letterSpacing: -0.8,
-    lineHeight: 32,
-    marginBottom: 10,
   },
-  headlineAccent: { color: PRIMARY },
-  sub: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: INK3,
-    textAlign: "center",
-    lineHeight: 20,
-  },
-  bottom: {
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-    gap: 10,
-  },
-  googleBtn: {
-    height: 56,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: "#DADCE0",
-    backgroundColor: "#fff",
-    flexDirection: "row",
+  actions: { zIndex: 1 },
+  googleButton: {
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
+    backgroundColor: "#EFE6DF",
   },
-  googleIconWrap: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#4285F4",
+  naverButton: {
     alignItems: "center",
     justifyContent: "center",
-  },
-  googleIconText: {
-    fontSize: 13,
-    fontWeight: "900",
-    color: "#fff",
-  },
-  googleBtnText: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#3C4043",
-  },
-  naverBtn: {
-    height: 56,
-    borderRadius: 14,
     backgroundColor: "#03C75A",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
   },
-  naverIconWrap: {
-    width: 24,
-    height: 24,
-    borderRadius: 4,
-    backgroundColor: "rgba(255,255,255,0.25)",
+  providerIcon: {
+    position: "absolute",
     alignItems: "center",
     justifyContent: "center",
   },
-  naverIconText: {
-    fontSize: 14,
-    fontWeight: "900",
-    color: "#fff",
-  },
-  naverBtnText: {
-    fontSize: 15,
+  buttonText: {
+    color: "#000000",
     fontWeight: "700",
-    color: "#fff",
+    letterSpacing: -0.4,
   },
+  naverText: { color: "#FFFFFF" },
   terms: {
-    fontSize: 11,
-    color: INK3,
+    color: "rgba(0,0,0,0.3)",
+    fontWeight: "500",
+    letterSpacing: -0.3,
     textAlign: "center",
-    lineHeight: 18,
-    marginTop: 6,
-  },
-  termsLink: {
-    color: INK1,
-    fontWeight: "600",
   },
 });

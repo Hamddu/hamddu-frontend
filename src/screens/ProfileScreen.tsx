@@ -20,8 +20,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFocusEffect } from "@react-navigation/native";
 import { useAuthStore } from "../store/authStore";
 import { unregisterPushNotifications } from "../services/notifications";
-import { getMyProfile, updateNickname } from "../api/users.api";
+import { getMyProfile, updateProfile } from "../api/users.api";
 import { xpApi, pointsApi, challengesApi, feedbacksApi, nicknamesApi, Challenge } from "../services/api";
+import ChallengeImagePlaceholder from "../components/ChallengeImagePlaceholder";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { getAvatarColors } from "../utils/avatarColors";
+import { pickAndUploadImage, ImageSource } from "../services/imageUpload";
 
 function getTimeAgo(dateStr: string): string {
   const diffMs = Date.now() - new Date(dateStr).getTime();
@@ -55,7 +59,7 @@ function CertCard({ item, wide = false }: { item: Challenge; wide?: boolean }) {
             onError={() => setImageFailed(true)}
           />
         ) : (
-          <Text style={styles.certThumbText}>사진 없음</Text>
+          <ChallengeImagePlaceholder compact />
         )}
       </View>
       <View style={styles.certItemInfo}>
@@ -76,6 +80,10 @@ export default function ProfileScreen() {
   const [nicknameModalVisible, setNicknameModalVisible] = useState(false);
   const [nickname, setNickname] = useState("");
   const [isSavingNickname, setIsSavingNickname] = useState(false);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [profileMediaId, setProfileMediaId] = useState<string | null>(null);
+  const [profileImageChanged, setProfileImageChanged] = useState(false);
+  const [isUploadingProfileImage, setIsUploadingProfileImage] = useState(false);
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [isSendingFeedback, setIsSendingFeedback] = useState(false);
@@ -100,25 +108,60 @@ export default function ProfileScreen() {
 
   const openNicknameModal = () => {
     setNickname(profile?.nickname ?? "");
+    setProfileImageUrl(profile?.profileImageUrl ?? null);
+    setProfileMediaId(profile?.profileMediaId ?? null);
+    setProfileImageChanged(false);
     setNicknameModalVisible(true);
+  };
+
+  const uploadProfileImage = async (source: ImageSource) => {
+    setIsUploadingProfileImage(true);
+    const result = await pickAndUploadImage(source);
+    setIsUploadingProfileImage(false);
+    if (!result.ok) {
+      if (result.error !== "cancelled") Alert.alert("사진을 올리지 못했어요", result.error);
+      return;
+    }
+    setProfileImageUrl(result.url);
+    setProfileMediaId(result.mediaId);
+    setProfileImageChanged(true);
+  };
+
+  const openProfileImageMenu = () => {
+    Alert.alert("프로필 사진", "사진을 선택해주세요.", [
+      { text: "사진 보관함", onPress: () => void uploadProfileImage("gallery") },
+      { text: "카메라", onPress: () => void uploadProfileImage("camera") },
+      ...(profileImageUrl
+        ? [{ text: "사진 삭제", style: "destructive" as const, onPress: () => {
+            setProfileImageUrl(null);
+            setProfileMediaId(null);
+            setProfileImageChanged(true);
+          } }]
+        : []),
+      { text: "취소", style: "cancel" },
+    ]);
   };
 
   const handleSaveNickname = async () => {
     const value = nickname.trim();
-    if (value.length < 2 || value === profile?.nickname || isSavingNickname) return;
+    const nicknameChanged = value !== profile?.nickname;
+    if (value.length < 2 || (!nicknameChanged && !profileImageChanged) || isSavingNickname) return;
 
     setIsSavingNickname(true);
     try {
-      if (!(await nicknamesApi.check(value))) {
+      if (nicknameChanged && !(await nicknamesApi.check(value))) {
         Alert.alert("사용 중인 닉네임이에요", "다른 닉네임을 입력해주세요.");
         return;
       }
-      const updatedProfile = await updateNickname(value);
+      const updatedProfile = await updateProfile({
+        ...(nicknameChanged ? { nickname: value } : {}),
+        ...(profileImageChanged ? { profileMediaId } : {}),
+      });
       queryClient.setQueryData(["profile", "me"], updatedProfile);
       setNicknameModalVisible(false);
-      Alert.alert("닉네임을 변경했어요");
+      Alert.alert("프로필을 변경했어요");
     } catch {
-      Alert.alert("닉네임을 변경하지 못했어요", "잠시 후 다시 시도해주세요.");
+      Alert.alert("프로필을 변경하지 못했어요", "잠시 후 다시 시도해주세요.");
     } finally {
       setIsSavingNickname(false);
     }
@@ -216,6 +259,10 @@ export default function ProfileScreen() {
       : 0;
   const displayName = profile?.nickname ?? "닉네임 없음";
   const avatarText = displayName.slice(0, 2);
+  const avatarColors = getAvatarColors(profile?.id ?? displayName);
+  const displayProfileImageUrl = normalizeImageUrl(profile?.profileImageUrl);
+  const draftProfileImageUrl = normalizeImageUrl(profileImageUrl);
+  const hasProfileChanges = nickname.trim() !== profile?.nickname || profileImageChanged;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -232,16 +279,13 @@ export default function ProfileScreen() {
           />
         }
       >
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.screenTitle}>마이</Text>
-            <Text style={styles.screenSubTitle}>내 뜨개 기록과 인증을 모아봤어요</Text>
-          </View>
-        </View>
-
         <View style={styles.userCard}>
-          <View style={styles.avatarWrap}>
-            <Text style={styles.avatarText}>{avatarText}</Text>
+          <View style={[styles.avatarWrap, { backgroundColor: avatarColors.backgroundColor }]}>
+            {displayProfileImageUrl ? (
+              <Image source={{ uri: displayProfileImageUrl }} style={styles.profileImage} resizeMode="cover" />
+            ) : (
+              <Text style={[styles.avatarText, { color: avatarColors.color }]}>{avatarText}</Text>
+            )}
           </View>
           <View style={styles.userInfo}>
             <View style={styles.userNameRow}>
@@ -254,7 +298,7 @@ export default function ProfileScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="닉네임 수정"
               >
-                <Text style={styles.editNicknameText}>수정</Text>
+                <Ionicons name="create-outline" size={17} color={INK3} />
               </TouchableOpacity>
               {xpWallet ? (
                 <View style={styles.levelBadge}>
@@ -284,17 +328,17 @@ export default function ProfileScreen() {
 
         <View style={styles.statsCard}>
           <View style={styles.statItem}>
+            <Text style={styles.statLabel}>보유 포인트</Text>
             <Text style={styles.statValue}>
               {pointsWallet ? pointsWallet.balance.toLocaleString() : "-"}
             </Text>
-            <Text style={styles.statLabel}>포인트</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
+            <Text style={styles.statLabel}>완료한 인증</Text>
             <Text style={[styles.statValue, styles.statValueOrange]}>
               {myChallenges.length}
             </Text>
-            <Text style={styles.statLabel}>인증 완료</Text>
           </View>
         </View>
 
@@ -354,19 +398,28 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        <TouchableOpacity
-          style={styles.feedbackBtn}
-          onPress={() => setFeedbackModalVisible(true)}
-          accessibilityRole="button"
-          accessibilityLabel="의견함 열기"
-        >
-          <Text style={styles.feedbackBtnText}>의견함</Text>
-          <Text style={styles.feedbackBtnArrow}>›</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <Text style={styles.logoutBtnText}>로그아웃</Text>
-        </TouchableOpacity>
+        <View style={styles.settingsSection}>
+          <Text style={styles.settingsTitle}>설정</Text>
+          <TouchableOpacity
+            style={styles.settingsRow}
+            onPress={() => setFeedbackModalVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel="의견함 열기"
+          >
+            <View style={styles.settingsRowLabel}>
+              <Ionicons name="chatbubble-ellipses-outline" size={21} color={INK2} />
+              <Text style={styles.feedbackBtnText}>의견함</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={INK3} />
+          </TouchableOpacity>
+          <View style={styles.settingsDivider} />
+          <TouchableOpacity style={styles.settingsRow} onPress={handleLogout}>
+            <View style={styles.settingsRowLabel}>
+              <Ionicons name="log-out-outline" size={21} color="#E5484D" />
+              <Text style={styles.logoutBtnText}>로그아웃</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
       <Modal visible={certModalVisible} animationType="slide">
@@ -417,7 +470,7 @@ export default function ProfileScreen() {
               accessibilityRole="button"
               accessibilityLabel="의견함 닫기"
             >
-              <Text style={styles.feedbackCloseText}>×</Text>
+              <Ionicons name="close" size={23} color={INK2} />
             </TouchableOpacity>
           </View>
           <View style={styles.feedbackForm}>
@@ -458,7 +511,10 @@ export default function ProfileScreen() {
               {isSendingFeedback ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <Text style={styles.feedbackSubmitText}>의견 보내기  →</Text>
+                <View style={styles.feedbackSubmitContent}>
+                  <Text style={styles.feedbackSubmitText}>의견 보내기</Text>
+                  <Ionicons name="arrow-forward" size={18} color="#fff" />
+                </View>
               )}
             </TouchableOpacity>
             <Text style={styles.feedbackPrivacy}>보내주신 의견은 서비스 개선에만 사용돼요.</Text>
@@ -474,7 +530,29 @@ export default function ProfileScreen() {
       >
         <View style={styles.dialogBackdrop}>
           <View style={styles.nicknameDialog}>
-            <Text style={styles.modalTitle}>닉네임 변경</Text>
+            <Text style={styles.modalTitle}>프로필 수정</Text>
+            <TouchableOpacity
+              style={styles.profileImageEditor}
+              onPress={openProfileImageMenu}
+              disabled={isUploadingProfileImage || isSavingNickname}
+              accessibilityRole="button"
+              accessibilityLabel="프로필 사진 변경"
+            >
+              <View style={[styles.profileImagePreview, { backgroundColor: avatarColors.backgroundColor }]}>
+                {isUploadingProfileImage ? (
+                  <ActivityIndicator color={PRIMARY} />
+                ) : draftProfileImageUrl ? (
+                  <Image source={{ uri: draftProfileImageUrl }} style={styles.profileImage} resizeMode="cover" />
+                ) : (
+                  <Text style={[styles.profileImagePreviewText, { color: avatarColors.color }]}>{nickname.slice(0, 2) || avatarText}</Text>
+                )}
+              </View>
+              <View style={styles.profileCameraBadge}>
+                <Ionicons name="camera" size={17} color="#fff" />
+              </View>
+            </TouchableOpacity>
+            <Text style={styles.profileImageHint}>사진을 눌러 변경하거나 삭제할 수 있어요</Text>
+            <Text style={styles.nicknameLabel}>닉네임</Text>
             <TextInput
               style={styles.nicknameInput}
               value={nickname}
@@ -482,7 +560,6 @@ export default function ProfileScreen() {
               placeholder="닉네임을 입력해주세요"
               placeholderTextColor={INK3}
               maxLength={30}
-              autoFocus
               returnKeyType="done"
               onSubmitEditing={handleSaveNickname}
               accessibilityLabel="새 닉네임"
@@ -499,11 +576,11 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={[
                   styles.dialogSaveBtn,
-                  (nickname.trim().length < 2 || nickname.trim() === profile?.nickname || isSavingNickname) &&
+                  (nickname.trim().length < 2 || !hasProfileChanges || isSavingNickname || isUploadingProfileImage) &&
                     styles.feedbackSubmitBtnDisabled,
                 ]}
                 onPress={handleSaveNickname}
-                disabled={nickname.trim().length < 2 || nickname.trim() === profile?.nickname || isSavingNickname}
+                disabled={nickname.trim().length < 2 || !hasProfileChanges || isSavingNickname || isUploadingProfileImage}
               >
                 {isSavingNickname ? (
                   <ActivityIndicator size="small" color="#fff" />
@@ -531,42 +608,21 @@ const PRIMARY_DEEP = "#C7521A";
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#FFFFFF" },
   container: { flex: 1, backgroundColor: "#FFFFFF" },
-  content: { paddingBottom: 48 },
+  content: { paddingBottom: 130 },
   centerState: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 20,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 14,
-  },
-  screenTitle: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: INK1,
-    lineHeight: 30,
-  },
-  screenSubTitle: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: INK3,
-    marginTop: 2,
-  },
   userCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 16,
-    marginHorizontal: 20,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: LINE,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 22,
+    marginBottom: 8,
   },
   avatarWrap: {
     width: 66,
@@ -576,7 +632,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginRight: 14,
+    overflow: "hidden",
   },
+  profileImage: { width: "100%", height: "100%" },
   avatarText: {
     fontSize: 18,
     fontWeight: "800",
@@ -592,17 +650,16 @@ const styles = StyleSheet.create({
   },
   username: {
     flexShrink: 1,
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: "800",
     color: INK1,
   },
   editNicknameBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: SURFACE,
+    width: 30,
+    height: 30,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  editNicknameText: { fontSize: 10, fontWeight: "800", color: INK2 },
   levelBadge: {
     backgroundColor: PRIMARY,
     paddingHorizontal: 8,
@@ -629,28 +686,26 @@ const styles = StyleSheet.create({
   statsCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: SURFACE,
-    borderRadius: 16,
-    paddingVertical: 17,
-    paddingHorizontal: 12,
-    marginHorizontal: 20,
-    marginBottom: 22,
+    backgroundColor: "#FFFFFF",
+    paddingVertical: 22,
+    paddingHorizontal: 20,
+    marginBottom: 8,
   },
-  statItem: { flex: 1, alignItems: "center" },
+  statItem: { flex: 1, alignItems: "flex-start", paddingHorizontal: 8 },
   statValue: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: "800",
     color: INK1,
   },
   statValueOrange: { color: PRIMARY },
-  statLabel: { fontSize: 11, color: INK3, fontWeight: "800", marginTop: 3 },
+  statLabel: { fontSize: 12, color: INK3, fontWeight: "700", marginBottom: 7 },
   statDivider: {
     width: 1,
     alignSelf: "stretch",
     backgroundColor: "#E6DED7",
     marginVertical: 4,
   },
-  certSection: { marginBottom: 22 },
+  certSection: { paddingTop: 22, paddingBottom: 24, marginBottom: 8, backgroundColor: "#FFFFFF" },
   certSectionHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -683,10 +738,8 @@ const styles = StyleSheet.create({
   certCard: {
     width: 158,
     backgroundColor: "#fff",
-    borderRadius: 16,
+    borderRadius: 14,
     overflow: "hidden",
-    borderWidth: 1,
-    borderColor: LINE,
   },
   certCardWide: {
     width: "48.5%",
@@ -706,7 +759,6 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
-  certThumbText: { fontSize: 11, color: INK3, fontWeight: "700" },
   certItemInfo: { padding: 10 },
   certItemTut: {
     fontSize: 12,
@@ -749,29 +801,29 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#fff",
   },
-  logoutBtn: {
-    marginHorizontal: 20,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: SURFACE,
-    alignItems: "center",
-    justifyContent: "center",
+  settingsSection: {
+    paddingTop: 20,
+    paddingBottom: 10,
+    backgroundColor: "#FFFFFF",
   },
-  feedbackBtn: {
-    marginHorizontal: 20,
-    marginBottom: 10,
-    height: 48,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: LINE,
-    paddingHorizontal: 16,
+  settingsTitle: {
+    paddingHorizontal: 20,
+    marginBottom: 8,
+    fontSize: 17,
+    fontWeight: "800",
+    color: INK1,
+  },
+  settingsRow: {
+    minHeight: 58,
+    paddingHorizontal: 20,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  feedbackBtnText: { fontSize: 14, fontWeight: "800", color: INK1 },
-  feedbackBtnArrow: { fontSize: 24, color: INK3 },
-  logoutBtnText: { fontSize: 14, fontWeight: "700", color: INK2 },
+  settingsRowLabel: { flexDirection: "row", alignItems: "center", gap: 12 },
+  settingsDivider: { height: 1, marginLeft: 53, backgroundColor: LINE },
+  feedbackBtnText: { fontSize: 15, fontWeight: "700", color: INK1 },
+  logoutBtnText: { fontSize: 15, fontWeight: "700", color: "#E5484D" },
   modalSafeArea: {
     flex: 1,
     backgroundColor: "#fff",
@@ -833,7 +885,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  feedbackCloseText: { fontSize: 26, lineHeight: 28, fontWeight: "400", color: INK2 },
   feedbackForm: { flex: 1, paddingHorizontal: 20, paddingBottom: 14 },
   feedbackIntro: {
     flexDirection: "row",
@@ -887,6 +938,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   feedbackSubmitBtnDisabled: { opacity: 0.4 },
+  feedbackSubmitContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
   feedbackSubmitText: { fontSize: 15, fontWeight: "800", color: "#fff" },
   feedbackPrivacy: {
     marginTop: 10,
@@ -908,9 +964,50 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     padding: 20,
   },
+  profileImageEditor: {
+    alignSelf: "center",
+    marginTop: 20,
+  },
+  profileImagePreview: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  profileImagePreviewText: {
+    fontSize: 24,
+    fontWeight: "800",
+  },
+  profileCameraBadge: {
+    position: "absolute",
+    right: -2,
+    bottom: 0,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 3,
+    borderColor: "#fff",
+    backgroundColor: PRIMARY,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  profileImageHint: {
+    marginTop: 9,
+    textAlign: "center",
+    fontSize: 11,
+    color: INK3,
+  },
+  nicknameLabel: {
+    marginTop: 20,
+    fontSize: 12,
+    fontWeight: "800",
+    color: INK2,
+  },
   nicknameInput: {
     height: 50,
-    marginTop: 18,
+    marginTop: 8,
     borderWidth: 1,
     borderColor: LINE,
     borderRadius: 12,

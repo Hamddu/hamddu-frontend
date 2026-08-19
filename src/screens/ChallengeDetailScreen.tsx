@@ -7,6 +7,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  RefreshControl,
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -15,6 +16,8 @@ import type { RouteProp } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import { challengesApi } from "../services/api";
 import { CommunityStackParamList } from "../types/navigation";
+import ChallengeImagePlaceholder from "../components/ChallengeImagePlaceholder";
+import { getAvatarColors } from "../utils/avatarColors";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "https://api.hamddu.online";
 const PRIMARY = "#FF7325";
@@ -23,7 +26,6 @@ const PRIMARY_DEEP = "#C7521A";
 const INK1 = "#1A1A1A";
 const INK2 = "#404040";
 const INK3 = "#8A8A8A";
-const LINE = "#ECECEC";
 const SURFACE = "#F7F5F2";
 const WHITE = "#FFFFFF";
 
@@ -57,7 +59,7 @@ export default function ChallengeDetailScreen() {
   const { width } = useWindowDimensions();
   const { challengeId } = route.params;
   const [imageFailed, setImageFailed] = useState(false);
-  const { data: challenges = [], isLoading, isError, refetch } = useQuery({
+  const { data: challenges = [], isLoading, isError, isRefetching, refetch } = useQuery({
     queryKey: ["challenges"],
     queryFn: challengesApi.getChallenges,
   });
@@ -95,30 +97,45 @@ export default function ChallengeDetailScreen() {
   const imageUrl = normalizeImageUrl(challenge.imageUrl);
   const authorName = challenge.author?.nickname ?? "익명";
   const avatarText = authorName.slice(0, 2);
+  const avatarColors = getAvatarColors(challenge.author?.id ?? authorName);
   const body = stripHtml(challenge.body);
+  const tutorialName = challenge.content?.name ?? "튜토리얼 인증";
+  const title = challenge.title ?? "인증 게시글";
+  const tutorialLabel = tutorialName.trim() === title.trim() ? "튜토리얼 인증" : tutorialName;
 
   return (
     <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        alwaysBounceVertical
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={() => void refetch()}
+            tintColor={PRIMARY}
+            colors={[PRIMARY]}
+          />
+        }
+      >
         <View style={styles.photoCard}>
           {imageUrl && !imageFailed ? (
             <Image
               source={{ uri: imageUrl }}
-              style={[styles.photo, { height: Math.min(width * 1.12, 520) }]}
+              style={[styles.photo, { height: Math.min(width, 480) }]}
               resizeMode="cover"
               onError={() => setImageFailed(true)}
             />
           ) : (
-            <View style={[styles.photo, styles.photoEmpty, { height: Math.min(width * 1.12, 520) }]}>
-              <Text style={styles.photoEmptyText}>사진 없음</Text>
+            <View style={[styles.photo, styles.photoEmpty, { height: Math.min(width, 480) }]}>
+              <ChallengeImagePlaceholder />
             </View>
           )}
         </View>
 
         <View style={styles.infoCard}>
           <View style={styles.authorRow}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{avatarText}</Text>
+            <View style={[styles.avatar, { backgroundColor: avatarColors.backgroundColor }]}>
+              <Text style={[styles.avatarText, { color: avatarColors.color }]}>{avatarText}</Text>
             </View>
             <View style={styles.authorInfo}>
               <Text style={styles.authorName} numberOfLines={1}>{authorName}</Text>
@@ -126,8 +143,8 @@ export default function ChallengeDetailScreen() {
             </View>
           </View>
 
-          <Text style={styles.tutorialChip}>{challenge.content?.name ?? "튜토리얼 인증"}</Text>
-          <Text style={styles.title}>{challenge.title ?? "인증 게시글"}</Text>
+          <Text style={styles.tutorialChip}>{tutorialLabel}</Text>
+          <Text style={styles.title}>{title}</Text>
           {body ? <Text style={styles.body}>{body}</Text> : null}
         </View>
       </ScrollView>
@@ -186,24 +203,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  photoEmptyText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: INK3,
-  },
   infoCard: {
-    marginHorizontal: 20,
-    marginTop: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: LINE,
     backgroundColor: WHITE,
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 28,
   },
   authorRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 14,
+    marginBottom: 24,
   },
   avatar: {
     width: 38,
@@ -236,25 +245,25 @@ const styles = StyleSheet.create({
   },
   tutorialChip: {
     alignSelf: "flex-start",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
     borderRadius: 999,
     backgroundColor: PRIMARY_SOFT,
     color: PRIMARY_DEEP,
     fontSize: 11,
     fontWeight: "800",
-    marginBottom: 10,
+    marginBottom: 14,
   },
   title: {
-    fontSize: 21,
+    fontSize: 24,
     fontWeight: "800",
     color: INK1,
-    lineHeight: 28,
+    lineHeight: 32,
   },
   body: {
-    marginTop: 10,
-    fontSize: 14,
-    lineHeight: 22,
+    marginTop: 14,
+    fontSize: 16,
+    lineHeight: 26,
     color: INK2,
   },
 });

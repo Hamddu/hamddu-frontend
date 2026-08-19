@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { View, StyleSheet, TouchableOpacity } from "react-native";
 import { Text } from "react-native-paper";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { getAvatarColors } from "../utils/avatarColors";
 import { Comment } from "../store/postStore";
 
 const INK1 = "#1A1A1A";
@@ -45,6 +47,7 @@ export default function CommentItem({
   rootCommentId = comment.id,
 }: CommentItemProps) {
   const authorName = comment.author?.nickname ?? "익명";
+  const avatarColors = getAvatarColors(comment.author?.id ?? authorName);
   const isOwner = authorName === currentUser;
   const timeAgo = getTimeAgo(comment.createdAt);
   const [showReplies, setShowReplies] = useState(depth === 0);
@@ -54,8 +57,8 @@ export default function CommentItem({
   return (
     <View style={[styles.container, depth > 0 && { paddingLeft: 44 }]}>
       {/* 아바타 */}
-      <View style={[styles.avatar, depth > 0 && styles.childAvatar]}>
-        <Text style={[styles.avatarText, depth > 0 && styles.childAvatarText]}>
+      <View style={[styles.avatar, depth > 0 && styles.childAvatar, { backgroundColor: avatarColors.backgroundColor }]}>
+        <Text style={[styles.avatarText, depth > 0 && styles.childAvatarText, { color: avatarColors.color }]}>
           {authorName.slice(0, 2)}
         </Text>
       </View>
@@ -77,9 +80,11 @@ export default function CommentItem({
 
         <View style={styles.actionRow}>
           <TouchableOpacity style={styles.likeBtn} onPress={() => onLike?.(comment)}>
-            <Text style={[styles.likeIcon, comment.likedByMe && { color: PRIMARY }]}>
-              {comment.likedByMe ? "♥" : "♡"}
-            </Text>
+            <Ionicons
+              name={comment.likedByMe ? "heart" : "heart-outline"}
+              size={15}
+              color={comment.likedByMe ? PRIMARY : INK3}
+            />
             <Text style={styles.likeCount}>{comment.likeCount}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => onReply?.(comment, rootCommentId)}>
@@ -123,8 +128,7 @@ export default function CommentItem({
 const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingVertical: 14,
     alignItems: "flex-start",
   },
   avatar: {
@@ -192,10 +196,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
-  },
-  likeIcon: {
-    fontSize: 11,
-    color: INK3,
   },
   likeCount: {
     fontSize: 11,

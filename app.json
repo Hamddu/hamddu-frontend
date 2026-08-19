@@ -1,11 +1,17 @@
 {
   "expo": {
-    "name": "Handdu",
+    "name": "함뜨",
     "slug": "knitting-community",
     "version": "1.0.0",
+    "icon": "./assets/icon/app-icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "backgroundColor": "#FF7325",
+    "splash": {
+      "image": "./assets/splash/yarn.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FF7326"
+    },
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,

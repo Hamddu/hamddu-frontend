@@ -23,6 +23,7 @@ import { HomeStackParamList } from "../types/navigation";
 import { watchHistoryApi, challengesApi } from "../services/api";
 import { pickAndUploadImage } from "../services/imageUpload";
 import { useScreenshotProtection } from "../hooks/useScreenshotProtection";
+import Ionicons from "@expo/vector-icons/Ionicons";
 
 const YoutubePlayer =
   Platform.OS !== "web"
@@ -405,7 +406,7 @@ export default function TutorialVideoScreen() {
             activeOpacity={0.85}
           >
             <View style={styles.centerPlayBtn}>
-              <Text style={styles.centerPlayIcon}>▶</Text>
+              <Ionicons name="play" size={26} color="#fff" style={{ marginLeft: 3 }} />
             </View>
           </TouchableOpacity>
         )}
@@ -416,7 +417,7 @@ export default function TutorialVideoScreen() {
           activeOpacity={0.75}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Text style={styles.backIcon}>‹</Text>
+          <Ionicons name="chevron-back" size={25} color="#fff" />
         </TouchableOpacity>
 
         <View style={styles.playerChrome}>
@@ -431,8 +432,10 @@ export default function TutorialVideoScreen() {
             style={styles.controlPlayBtn}
             onPress={togglePlayback}
             activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={isPlaying ? "일시정지" : "재생"}
           >
-            <Text style={styles.controlPlayText}>{isPlaying ? "Ⅱ" : "▶"}</Text>
+            <Ionicons name={isPlaying ? "pause" : "play"} size={18} color="#fff" style={!isPlaying ? { marginLeft: 2 } : undefined} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.seekBtn}
@@ -468,14 +471,33 @@ export default function TutorialVideoScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.titleSection}>
+          <Text style={styles.titleEyebrow}>영상 튜토리얼</Text>
           <Text style={styles.videoTitle} onLongPress={() => setShowScreenshotWarn(true)}>{title}</Text>
           <Text style={styles.videoDesc}>
             영상을 따라 천천히 연습해보세요. 처음엔 느리게, 익숙해지면 빠르게!
           </Text>
         </View>
 
+        <View style={styles.progressCard}>
+          <View style={styles.progressCardHeader}>
+            <View>
+              <Text style={styles.cardLabel}>학습 진행률</Text>
+              <Text style={styles.progressCardTitle}>
+                {progressPct >= 100 ? "모두 시청했어요" : progressPct > 0 ? "이어서 학습해보세요" : "첫 코를 시작해볼까요?"}
+              </Text>
+            </View>
+            <Text style={styles.progressCardValue}>{Math.round(progressPct)}%</Text>
+          </View>
+          <View style={styles.contentProgressTrack}>
+            <View style={[styles.contentProgressFill, { width: `${progressPct}%` as any }]} />
+          </View>
+        </View>
+
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>재생 속도</Text>
+          <View style={styles.sectionHeading}>
+            <Text style={styles.sectionTitle}>재생 속도</Text>
+            <Text style={styles.sectionHint}>내 속도에 맞게 조절하세요</Text>
+          </View>
           <View style={styles.speedRow}>
             {SPEEDS.map((s) => (
               <TouchableOpacity
@@ -492,25 +514,37 @@ export default function TutorialVideoScreen() {
           </View>
         </View>
 
-        {!alreadyCertified && (
-          <View style={styles.certBanner}>
-            <Text style={styles.certMascot}>🐹</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.certText}>
-                영상 완료 후 인증 사진을 올리면 포인트를 받아요!
-              </Text>
+        {alreadyCertified ? (
+          <View style={styles.certCompleteCard}>
+            <View style={styles.certIconWrap}>
+              <Ionicons name="checkmark" size={22} color="#16A36A" />
+            </View>
+            <View style={styles.certContent}>
+              <Text style={styles.certTitle}>인증까지 완료했어요</Text>
+              <Text style={styles.certText}>멋진 뜨개 기록이 마이에 저장되어 있어요.</Text>
             </View>
           </View>
-        )}
-
-        {!alreadyCertified && (
-          <TouchableOpacity
-            style={styles.doneBtn}
-            onPress={handleDone}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.doneBtnText}>완료하기</Text>
-          </TouchableOpacity>
+        ) : (
+          <View style={styles.certCard}>
+            <View style={styles.certHeader}>
+              <View style={styles.certIconWrap}>
+                <Ionicons name="ribbon-outline" size={22} color={PRIMARY} />
+              </View>
+              <View style={styles.certContent}>
+                <Text style={styles.certTitle}>완성한 작품을 인증해보세요</Text>
+                <Text style={styles.certText}>인증 사진을 올리면 포인트와 XP를 받을 수 있어요.</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.doneBtn}
+              onPress={handleDone}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="튜토리얼 완료하기"
+            >
+              <Text style={styles.doneBtnText}>완료하고 인증하기</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </ScrollView>
 
@@ -675,11 +709,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  centerPlayIcon: {
-    fontSize: 24,
-    color: "#fff",
-    marginLeft: 4,
-  },
   playerChrome: {
     minHeight: 78,
     flexDirection: "row",
@@ -697,12 +726,6 @@ const styles = StyleSheet.create({
     backgroundColor: PRIMARY,
     alignItems: "center",
     justifyContent: "center",
-  },
-  controlPlayText: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "900",
-    marginLeft: 1,
   },
   seekBtn: {
     width: 36,
@@ -768,55 +791,116 @@ const styles = StyleSheet.create({
     left: 14,
     width: 36,
     height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(0,0,0,0.45)",
     alignItems: "center",
     justifyContent: "center",
   },
-  backIcon: { color: "#fff", fontSize: 28, lineHeight: 34, marginTop: -2 },
+  scroll: { flex: 1, backgroundColor: "#F5F6F8" },
+  content: { paddingTop: 16, paddingHorizontal: 16 },
 
-  scroll: { flex: 1 },
-  content: { paddingTop: 20, paddingHorizontal: 16 },
-
-  titleSection: { marginBottom: 20 },
+  titleSection: {
+    padding: 20,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+    marginBottom: 12,
+  },
+  titleEyebrow: {
+    marginBottom: 8,
+    color: PRIMARY,
+    fontSize: 12,
+    fontWeight: "800",
+  },
   videoTitle: {
-    fontSize: 20,
+    fontSize: 23,
     fontWeight: "800",
     color: INK1,
     letterSpacing: -0.4,
-    marginBottom: 6,
-    lineHeight: 26,
+    marginBottom: 8,
+    lineHeight: 30,
   },
-  videoDesc: { fontSize: 13, color: INK3, lineHeight: 20 },
+  videoDesc: { fontSize: 14, color: INK3, lineHeight: 21 },
 
-  section: { marginBottom: 20 },
-  sectionLabel: { fontSize: 13, fontWeight: "700", color: INK3, marginBottom: 8 },
+  progressCard: {
+    padding: 20,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+    marginBottom: 12,
+  },
+  progressCardHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 16,
+  },
+  cardLabel: { fontSize: 12, fontWeight: "700", color: INK3, marginBottom: 5 },
+  progressCardTitle: { fontSize: 16, lineHeight: 22, fontWeight: "800", color: INK1 },
+  progressCardValue: { fontSize: 22, lineHeight: 28, fontWeight: "800", color: PRIMARY },
+  contentProgressTrack: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#F0F1F3",
+    overflow: "hidden",
+  },
+  contentProgressFill: { height: "100%", borderRadius: 4, backgroundColor: PRIMARY },
+
+  section: {
+    padding: 20,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+    marginBottom: 12,
+  },
+  sectionHeading: { marginBottom: 14 },
+  sectionTitle: { fontSize: 16, fontWeight: "800", color: INK1, marginBottom: 4 },
+  sectionHint: { fontSize: 12, fontWeight: "600", color: INK3 },
   speedRow: { flexDirection: "row", gap: 8 },
   speedBtn: {
     flex: 1,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: "#fff",
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: "#F2F4F6",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: LINE,
   },
-  speedBtnActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  speedBtnActive: { backgroundColor: PRIMARY },
   speedText: { fontSize: 13, fontWeight: "800", color: INK1 },
   speedTextActive: { color: "#fff" },
 
-  certBanner: {
+  certCard: {
+    padding: 20,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+  },
+  certCompleteCard: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    backgroundColor: PRIMARY_SOFT,
-    borderRadius: 16,
-    marginBottom: 20,
-    padding: 14,
+    padding: 20,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
   },
-  certMascot: { fontSize: 32 },
-  certText: { fontSize: 13, color: PRIMARY_DEEP, fontWeight: "600", lineHeight: 20 },
+  certHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 18,
+  },
+  certIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFF1E8",
+  },
+  certContent: { flex: 1, minWidth: 0 },
+  certTitle: {
+    marginBottom: 4,
+    color: INK1,
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: "800",
+  },
+  certText: { fontSize: 13, color: INK3, fontWeight: "600", lineHeight: 19 },
 
   doneBtn: {
     height: 52,
@@ -824,11 +908,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: PRIMARY_DEEP,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
   },
   doneBtnText: { color: "#fff", fontSize: 16, fontWeight: "800" },
 

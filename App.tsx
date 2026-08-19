@@ -1,11 +1,14 @@
-import React, { useEffect, useRef } from "react";
-import { Animated, Text, TouchableOpacity } from "react-native";
-import { NavigationContainer, getFocusedRouteNameFromRoute } from "@react-navigation/native";
+import React, { useEffect, useRef, useState } from "react";
+import { Animated, Text, TouchableOpacity, View } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { DefaultTheme, NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Provider as PaperProvider } from "react-native-paper";
 import type { SvgProps } from "react-native-svg";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { BlurView } from "expo-blur";
+import { requireOptionalNativeModule } from "expo-modules-core";
 
 import HomeActiveIcon from "./assets/tab-icons/home_active.svg";
 import HomeDisabledIcon from "./assets/tab-icons/home_disabled.svg";
@@ -26,10 +29,12 @@ import AddPostScreen from "./src/screens/AddPostScreen";
 import LoginScreen from "./src/screens/LoginScreen";
 import SurveyScreen from "./src/screens/SurveyScreen";
 import SurveyQuestionsScreen from "./src/screens/SurveyQuestionsScreen";
+import SplashScreen from "./src/screens/SplashScreen";
 
 import { useAuthStore } from "./src/store/authStore";
 import { registerForPushNotifications } from "./src/services/notifications";
 import { useCounterStore } from "./src/store/counterStore";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const Tab = createBottomTabNavigator();
 const HomeStack = createNativeStackNavigator();
@@ -38,21 +43,9 @@ const SurveyStack = createNativeStackNavigator();
 const RootStack = createNativeStackNavigator();
 
 const PRIMARY = "#FF7325";
-const CREAM = "#FFF8F2";
-const CREAM_LINE = "#EFE6DF";
 const INK3 = "#8A8A8A";
 const WHITE = "#FFFFFF";
-const WHITE_LINE = "#ECECEC";
-const BASE_TAB_BAR_STYLE = {
-  elevation: 8,
-  shadowColor: "#000",
-  shadowOffset: { width: 0, height: -2 },
-  shadowOpacity: 0.06,
-  shadowRadius: 8,
-  height: 70,
-  paddingTop: 8,
-  paddingBottom: 8,
-} as const;
+const NATIVE_BLUR_AVAILABLE = !!requireOptionalNativeModule("ExpoBlur");
 
 function TabIcon({
   focused,
@@ -64,8 +57,6 @@ function TabIcon({
   DisabledIcon: React.ComponentType<SvgProps>;
 }) {
   const progress = useRef(new Animated.Value(focused ? 1 : 0)).current;
-  const Icon = focused ? ActiveIcon : DisabledIcon;
-
   useEffect(() => {
     Animated.spring(progress, {
       toValue: focused ? 1 : 0,
@@ -94,7 +85,19 @@ function TabIcon({
         ],
       }}
     >
-      <Icon width={32} height={32} />
+      <View style={{ width: 32, height: 32 }}>
+        <Animated.View style={{ position: "absolute", opacity: progress }}>
+          <ActiveIcon width={32} height={32} />
+        </Animated.View>
+        <Animated.View
+          style={{
+            position: "absolute",
+            opacity: progress.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
+          }}
+        >
+          <DisabledIcon width={32} height={32} />
+        </Animated.View>
+      </View>
     </Animated.View>
   );
 }
@@ -105,12 +108,12 @@ function HomeStackNavigator() {
       <HomeStack.Screen
         name="TutorialList"
         component={HomeScreen}
-        options={{ headerShown: false }}
+        options={{ headerShown: false, contentStyle: { backgroundColor: PRIMARY } }}
       />
       <HomeStack.Screen
         name="TutorialVideo"
         component={TutorialVideoScreen}
-        options={{ headerShown: false }}
+        options={{ headerShown: false, contentStyle: { backgroundColor: "#000" } }}
       />
     </HomeStack.Navigator>
   );
@@ -123,10 +126,26 @@ function HeaderBackButton({ onPress }: { onPress: () => void }) {
       hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
       accessibilityRole="button"
       accessibilityLabel="뒤로가기"
-      style={{ width: 36, height: 36, justifyContent: "center" }}
+      style={{ width: 36, height: 36, alignItems: "center", justifyContent: "center" }}
     >
-      <Text style={{ color: "#1A1A1A", fontSize: 30, lineHeight: 34 }}>‹</Text>
+      <Ionicons name="chevron-back" size={25} color="#1A1A1A" />
     </TouchableOpacity>
+  );
+}
+
+function CommunityHeader({ title, onBack }: { title: string; onBack: () => void }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={{ height: insets.top + 56, paddingTop: insets.top, backgroundColor: WHITE }}>
+      <View style={{ height: 56, flexDirection: "row", alignItems: "center", paddingHorizontal: 14 }}>
+        <HeaderBackButton onPress={onBack} />
+        <Text
+          style={{ position: "absolute", left: 56, right: 56, bottom: 16, textAlign: "center", fontSize: 17, fontWeight: "800", color: "#1A1A1A" }}
+        >
+          {title}
+        </Text>
+      </View>
+    </View>
   );
 }
 
@@ -134,11 +153,13 @@ function CommunityStackNavigator() {
   return (
     <CommunityStack.Navigator
       screenOptions={({ navigation }) => ({
-        headerBackVisible: false,
-        headerLeft: () => <HeaderBackButton onPress={navigation.goBack} />,
-        headerStyle: { backgroundColor: "#fff" },
-        headerTintColor: "#1A1A1A",
-        headerTitleStyle: { fontWeight: "800" },
+        header: ({ options }) => (
+          <CommunityHeader
+            title={typeof options.headerTitle === "string" ? options.headerTitle : options.title ?? ""}
+            onBack={navigation.goBack}
+          />
+        ),
+        contentStyle: { backgroundColor: WHITE },
       })}
     >
       <CommunityStack.Screen
@@ -149,7 +170,7 @@ function CommunityStackNavigator() {
       <CommunityStack.Screen
         name="PostDetail"
         component={PostDetailScreen}
-        options={{ headerTitle: "게시물" }}
+        options={{ headerTitle: "" }}
       />
       <CommunityStack.Screen
         name="ChallengeDetail"
@@ -159,39 +180,84 @@ function CommunityStackNavigator() {
       <CommunityStack.Screen
         name="AddPost"
         component={AddPostScreen}
-        options={{ headerTitle: "작품 등록" }}
+        options={({ route }: any) => ({ headerTitle: route.params?.postId ? "게시글 수정" : "작품 등록" })}
       />
     </CommunityStack.Navigator>
   );
 }
 
+function FloatingTabBackground() {
+  return (
+    <View style={{ flex: 1, borderRadius: 38, overflow: "hidden" }}>
+      {NATIVE_BLUR_AVAILABLE && (
+        <BlurView
+          intensity={72}
+          tint="light"
+          style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
+        />
+      )}
+      <View
+        style={{
+          position: "absolute",
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: 0,
+          backgroundColor: NATIVE_BLUR_AVAILABLE
+            ? "rgba(248,248,248,0.48)"
+            : "rgba(248,248,248,0.84)",
+        }}
+      />
+    </View>
+  );
+}
+
 function MainTabs() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => {
-        const focusedRouteName = getFocusedRouteNameFromRoute(route);
-        const isHomeMain =
-          route.name === "Home" &&
-          (!focusedRouteName || focusedRouteName === "TutorialList");
-        const tabBackgroundColor = isHomeMain ? CREAM : WHITE;
-
-        return {
+      detachInactiveScreens={false}
+      screenOptions={{
+        lazy: false,
+        sceneStyle: { backgroundColor: WHITE },
         tabBarActiveTintColor: PRIMARY,
         tabBarInactiveTintColor: INK3,
         tabBarStyle: {
-          ...BASE_TAB_BAR_STYLE,
-          backgroundColor: tabBackgroundColor,
+          position: "absolute",
+          left: "5%",
+          width: "90%",
+          bottom: Math.max(insets.bottom + 12, 38),
+          height: 78,
+          paddingHorizontal: 5,
+          paddingTop: 7,
+          paddingBottom: 7,
+          borderRadius: 38,
           borderTopWidth: 1,
-          borderTopColor: isHomeMain ? CREAM_LINE : WHITE_LINE,
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.72)",
+          backgroundColor: "transparent",
+          shadowColor: "#101114",
+          shadowOffset: { width: 0, height: 10 },
+          shadowOpacity: 0.14,
+          shadowRadius: 22,
+          elevation: 12,
         },
+        tabBarBackground: () => <FloatingTabBackground />,
+        tabBarItemStyle: {
+          marginHorizontal: 4,
+          borderRadius: 32,
+          overflow: "hidden",
+        },
+        tabBarActiveBackgroundColor: "rgba(255,255,255,0.8)",
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: "600",
-          marginBottom: 0,
+          fontWeight: "700",
+          lineHeight: 14,
+          marginBottom: 2,
         },
         tabBarHideOnKeyboard: true,
         headerShown: false,
-      };
       }}
     >
       <Tab.Screen
@@ -296,8 +362,18 @@ function SurveyStackNavigator() {
 }
 
 function RootNavigator() {
+  const [hydrated, setHydrated] = useState(useAuthStore.persist.hasHydrated());
   const accessToken = useAuthStore((s) => s.accessToken);
   const surveyRequired = useAuthStore((s) => s.surveyRequired);
+
+  useEffect(() => {
+    const unsubscribe = useAuthStore.persist.onFinishHydration(() => setHydrated(true));
+    if (useAuthStore.persist.hasHydrated()) setHydrated(true);
+    return unsubscribe;
+  }, []);
+
+  if (!hydrated) return <SplashScreen />;
+
   return (
     <RootStack.Navigator screenOptions={{ headerShown: false }}>
       {!accessToken ? (
@@ -317,11 +393,20 @@ const queryClient = new QueryClient({
   },
 });
 
+const navigationTheme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    background: WHITE,
+    card: WHITE,
+  },
+};
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <PaperProvider>
-        <NavigationContainer>
+        <NavigationContainer theme={navigationTheme}>
           <AppInitializer>
             <RootNavigator />
           </AppInitializer>

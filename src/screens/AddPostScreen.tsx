@@ -13,9 +13,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import type { RouteProp } from '@react-navigation/native';
 import { useHeaderHeight } from '@react-navigation/elements';
-import { useAddPost } from '../hooks/usePosts';
+import { useAddPost, usePost, useUpdatePost } from '../hooks/usePosts';
+import type { CommunityStackParamList } from '../types/navigation';
 import { categoriesApi } from '../services/api';
 import { RichEditor, RichToolbar, actions } from 'react-native-pell-rich-editor';
 import { pickAndUploadImage } from '../services/imageUpload';
@@ -27,14 +29,20 @@ function stripHtml(html: string): string {
 }
 
 export default function AddPostScreen() {
+  const route = useRoute<RouteProp<CommunityStackParamList, 'AddPost'>>();
+  const postId = route.params?.postId;
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [mediaIds, setMediaIds] = useState<string[]>([]);
+  const [mediaChanged, setMediaChanged] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   const richEditorRef = useRef<RichEditor>(null);
+  const initializedPostId = useRef<string | undefined>(undefined);
   const addPostMutation = useAddPost();
+  const updatePostMutation = useUpdatePost();
+  const { data: editingPost, isLoading: postLoading } = usePost(postId ?? '');
   const navigation = useNavigation();
   const headerHeight = useHeaderHeight();
 
@@ -53,6 +61,7 @@ export default function AddPostScreen() {
             return;
           }
           setMediaIds((ids) => [...ids, result.mediaId]);
+          setMediaChanged(true);
           richEditorRef.current?.insertImage(result.url, 'style="max-width:100%;border-radius:8px;"');
         },
       },
@@ -69,6 +78,7 @@ export default function AddPostScreen() {
             return;
           }
           setMediaIds((ids) => [...ids, result.mediaId]);
+          setMediaChanged(true);
           richEditorRef.current?.insertImage(result.url, 'style="max-width:100%;border-radius:8px;"');
         },
       },
@@ -85,6 +95,15 @@ export default function AddPostScreen() {
     if (!categoryId && categories.length > 0) setCategoryId(categories[0].id);
   }, [categories, categoryId]);
 
+  useEffect(() => {
+    if (!postId || !editingPost || initializedPostId.current === postId) return;
+    initializedPostId.current = postId;
+    setTitle(editingPost.title);
+    setBody(editingPost.body);
+    setCategoryId(editingPost.category?.id ?? '');
+    setMediaIds(editingPost.media?.filter((item) => item.id !== item.url).map((item) => item.id) ?? []);
+  }, [editingPost, postId]);
+
   const bodyText = stripHtml(body);
   const isValid = title.trim().length > 0 && bodyText.length > 0 && !!categoryId;
 
@@ -94,17 +113,31 @@ export default function AddPostScreen() {
       return;
     }
     try {
-      await addPostMutation.mutateAsync({
-        title: title.trim(),
-        body,
-        categoryId,
-        mediaIds,
-      });
+      const post = { title: title.trim(), body, categoryId };
+      if (postId) {
+        await updatePostMutation.mutateAsync({
+          id: postId,
+          ...post,
+          ...(mediaChanged ? { mediaIds } : {}),
+        });
+      } else {
+        await addPostMutation.mutateAsync({ ...post, mediaIds });
+      }
       navigation.goBack();
     } catch {
-      Alert.alert('오류', '게시글 등록에 실패했습니다. 다시 시도해주세요.');
+      Alert.alert('오류', `게시글 ${postId ? '수정' : '등록'}에 실패했습니다. 다시 시도해주세요.`);
     }
   };
+
+  const isPending = addPostMutation.isPending || updatePostMutation.isPending;
+
+  if (postId && postLoading) {
+    return <View style={styles.loading}><ActivityIndicator color={PRIMARY} /></View>;
+  }
+
+  if (postId && !editingPost) {
+    return <View style={styles.loading}><Text style={styles.catError}>게시글을 불러오지 못했어요.</Text></View>;
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
@@ -205,6 +238,7 @@ export default function AddPostScreen() {
           <View style={styles.editorWrap}>
             <RichEditor
               ref={richEditorRef}
+              initialContentHTML={editingPost?.body}
               style={styles.editor}
               initialHeight={220}
               placeholder="내용을 입력하세요"
@@ -223,15 +257,15 @@ export default function AddPostScreen() {
         {/* 등록 버튼 */}
         <View style={styles.footer}>
           <TouchableOpacity
-            style={[styles.submitBtn, (!isValid || addPostMutation.isPending) && styles.submitBtnDisabled]}
+            style={[styles.submitBtn, (!isValid || isPending) && styles.submitBtnDisabled]}
             onPress={handleSubmit}
-            disabled={!isValid || addPostMutation.isPending}
+            disabled={!isValid || isPending}
             activeOpacity={0.85}
           >
-            {addPostMutation.isPending ? (
+            {isPending ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.submitBtnText}>등록하기</Text>
+              <Text style={styles.submitBtnText}>{postId ? '수정하기' : '등록하기'}</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -248,6 +282,7 @@ const INK3 = '#8A8A8A';
 const LINE = '#ECECEC';
 
 const styles = StyleSheet.create({
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
   flex: { flex: 1 },
   scroll: { flex: 1 },

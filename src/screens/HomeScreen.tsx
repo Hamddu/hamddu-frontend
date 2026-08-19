@@ -8,6 +8,7 @@ import {
   Image,
   Modal,
   Animated,
+  RefreshControl,
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -15,6 +16,7 @@ import { useNavigation } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import Svg, { Defs, Mask, Path, SvgUri, type SvgProps } from "react-native-svg";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import BackgroundHamdde from "../../assets/home/background-hamdde.svg";
 import Hat from "../../assets/home/hat.svg";
 import Knitting01Active from "../../assets/home/tutorial/knitting/icon/knitting_01_active.svg";
@@ -338,19 +340,19 @@ export default function HomeScreen() {
     };
   }, [lineDraw]);
 
-  const { data: profile } = useQuery({
+  const { data: profile, refetch: refetchProfile } = useQuery({
     queryKey: ["profile", "me"],
     queryFn: getMyProfile,
   });
-  const { data: tutorials = [], isLoading: tutorialsLoading } = useQuery({
+  const { data: tutorials = [], isLoading: tutorialsLoading, isRefetching: tutorialsRefreshing, refetch: refetchTutorials } = useQuery({
     queryKey: ["contents", "tutorials"],
     queryFn: contentsApi.getTutorials,
   });
-  const { data: watchHistory = [] } = useQuery({
+  const { data: watchHistory = [], refetch: refetchWatchHistory } = useQuery({
     queryKey: ["watch-history"],
     queryFn: watchHistoryApi.getAll,
   });
-  const { data: myChallenges = [] } = useQuery({
+  const { data: myChallenges = [], refetch: refetchMyChallenges } = useQuery({
     queryKey: ["challenges", "my"],
     queryFn: challengesApi.getMyChallenges,
   });
@@ -372,6 +374,11 @@ export default function HomeScreen() {
   const selectedHistory = selectedLesson
     ? historyMap[selectedLesson.contentId]
     : undefined;
+  const selectedProgress = selectedLesson
+    ? selectedLesson.state === "done" || certifiedContentIds.has(selectedLesson.contentId)
+      ? 100
+      : Math.round(selectedLesson.pct ?? 0)
+    : 0;
   const nodeAssets = isCrochet ? CROCHET_ASSETS : KNITTING_ASSETS;
   const nodeLayouts = isCrochet ? CROCHET_NODE_LAYOUT : KNITTING_NODE_LAYOUT;
   const mapBaseHeight = isCrochet ? 880 : 640;
@@ -400,7 +407,7 @@ export default function HomeScreen() {
       <SafeAreaView style={styles.loadingSafeArea}>
         <ActivityIndicator
           size="large"
-          color={PRIMARY}
+          color="#FFFFFF"
           style={{ marginTop: 60 }}
         />
       </SafeAreaView>
@@ -496,6 +503,7 @@ export default function HomeScreen() {
         </Animated.View>
       </Animated.View>
 
+      <View pointerEvents="none" style={styles.sheetLeftCornerBackdrop} />
       <Animated.View
         style={[
           styles.sheet,
@@ -551,6 +559,22 @@ export default function HomeScreen() {
           )}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
+          alwaysBounceVertical
+          refreshControl={
+            <RefreshControl
+              refreshing={tutorialsRefreshing}
+              onRefresh={() => {
+                void Promise.all([
+                  refetchProfile(),
+                  refetchTutorials(),
+                  refetchWatchHistory(),
+                  refetchMyChallenges(),
+                ]);
+              }}
+              tintColor="#FF7325"
+              colors={["#FF7325"]}
+            />
+          }
         >
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>기초 기법</Text>
@@ -700,17 +724,45 @@ export default function HomeScreen() {
           {selectedLesson && selectedIndex !== null && (
             <View style={[styles.lessonModal, { paddingBottom: insets.bottom + 18 }]}>
               <View style={styles.modalHandle} />
-              {selectedLesson.videoId ? (
-                <Image
-                  source={{ uri: `https://img.youtube.com/vi/${selectedLesson.videoId}/mqdefault.jpg` }}
-                  style={styles.modalThumb}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={[styles.modalThumb, styles.modalThumbFallback]}>
-                  <Text style={styles.modalThumbFallbackText}>영상 준비중</Text>
+              <View style={styles.modalTopRow}>
+                <View style={styles.modalStatusChip}>
+                  <Ionicons
+                    name={selectedProgress === 100 ? "checkmark-circle" : selectedProgress > 0 ? "play-circle" : "sparkles"}
+                    size={16}
+                    color={PRIMARY}
+                  />
+                  <Text style={styles.modalStatusText}>
+                    {selectedProgress === 100 ? "학습 완료" : selectedProgress > 0 ? "학습 중" : "새 강의"}
+                  </Text>
                 </View>
-              )}
+                <TouchableOpacity
+                  style={styles.modalCloseButton}
+                  onPress={() => setSelectedIndex(null)}
+                  accessibilityRole="button"
+                  accessibilityLabel="닫기"
+                >
+                  <Ionicons name="close" size={22} color={INK1} />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.modalMedia}>
+                {selectedLesson.videoId ? (
+                  <Image
+                    source={{ uri: `https://img.youtube.com/vi/${selectedLesson.videoId}/mqdefault.jpg` }}
+                    style={styles.modalThumb}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={[styles.modalThumb, styles.modalThumbFallback]}>
+                    <Ionicons name="videocam-off-outline" size={30} color={INK3} />
+                    <Text style={styles.modalThumbFallbackText}>영상 준비중</Text>
+                  </View>
+                )}
+                {selectedLesson.videoId ? (
+                  <View style={styles.modalPlayIcon}>
+                    <Ionicons name="play" size={20} color="#fff" style={{ marginLeft: 2 }} />
+                  </View>
+                ) : null}
+              </View>
               <Text style={styles.modalTitle}>{selectedLesson.title}</Text>
               <Text style={styles.modalSub}>
                 {isUnlocked(selectedIndex)
@@ -723,13 +775,14 @@ export default function HomeScreen() {
                       : "영상 튜토리얼을 시작해보세요"
                   : "이전 영상을 완료하면 열려요"}
               </Text>
-              <View style={styles.modalProgressTrack}>
-                <View
-                  style={[
-                    styles.modalProgressFill,
-                    { width: `${selectedLesson.state === "done" ? 100 : selectedLesson.pct ?? 0}%` as any },
-                  ]}
-                />
+              <View style={styles.modalProgressCard}>
+                <View style={styles.modalProgressHeader}>
+                  <Text style={styles.modalProgressLabel}>학습 진행률</Text>
+                  <Text style={styles.modalProgressValue}>{selectedProgress}%</Text>
+                </View>
+                <View style={styles.modalProgressTrack}>
+                  <View style={[styles.modalProgressFill, { width: `${selectedProgress}%` as any }]} />
+                </View>
               </View>
               <TouchableOpacity
                 style={[
@@ -769,8 +822,8 @@ const INK1 = "#1A1A1A";
 const INK3 = "#8A8A8A";
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: PRIMARY },
-  loadingSafeArea: { flex: 1, backgroundColor: "#FFFFFF" },
+  root: { flex: 1, backgroundColor: CREAM },
+  loadingSafeArea: { flex: 1, backgroundColor: PRIMARY },
   hero: {
     backgroundColor: PRIMARY,
     overflow: "hidden",
@@ -819,6 +872,14 @@ const styles = StyleSheet.create({
     right: 18,
     bottom: 16,
   },
+  sheetLeftCornerBackdrop: {
+    position: "absolute",
+    left: 0,
+    top: HERO_HEIGHT - 4,
+    width: 28,
+    height: 28,
+    backgroundColor: PRIMARY,
+  },
   sheet: {
     flex: 1,
     marginTop: -4,
@@ -828,6 +889,7 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderBottomWidth: 0,
     borderColor: CREAM_LINE,
+    overflow: "hidden",
   },
   sheetTabs: {
     position: "absolute",
@@ -943,8 +1005,8 @@ const styles = StyleSheet.create({
   },
   lessonModal: {
     backgroundColor: "#fff",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     padding: 20,
   },
   modalHandle: {
@@ -953,18 +1015,64 @@ const styles = StyleSheet.create({
     height: 5,
     borderRadius: 999,
     backgroundColor: "#E3E3E3",
-    marginBottom: 16,
+    marginBottom: 10,
+  },
+  modalTopRow: {
+    minHeight: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  modalStatusChip: {
+    height: 32,
+    paddingHorizontal: 11,
+    borderRadius: 999,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#FFF1E8",
+  },
+  modalStatusText: {
+    color: PRIMARY,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  modalCloseButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F2F4F6",
+  },
+  modalMedia: {
+    position: "relative",
+    marginBottom: 18,
+  },
+  modalPlayIcon: {
+    position: "absolute",
+    left: "50%",
+    top: "50%",
+    width: 48,
+    height: 48,
+    marginLeft: -24,
+    marginTop: -24,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(26,26,26,0.78)",
   },
   modalThumb: {
     width: "100%",
     aspectRatio: 16 / 9,
-    borderRadius: 16,
+    borderRadius: 18,
     backgroundColor: "#F2F2F2",
-    marginBottom: 16,
   },
   modalThumbFallback: {
     alignItems: "center",
     justifyContent: "center",
+    gap: 8,
   },
   modalThumbFallbackText: {
     color: INK3,
@@ -973,22 +1081,45 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     color: INK1,
-    fontSize: 20,
-    fontWeight: "900",
+    fontSize: 22,
+    lineHeight: 29,
+    fontWeight: "800",
     letterSpacing: -0.4,
   },
   modalSub: {
     color: INK3,
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "600",
     marginTop: 6,
+    lineHeight: 19,
+  },
+  modalProgressCard: {
+    marginTop: 18,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: "#F7F8FA",
+  },
+  modalProgressHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  modalProgressLabel: {
+    color: INK3,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  modalProgressValue: {
+    color: INK1,
+    fontSize: 15,
+    fontWeight: "800",
   },
   modalProgressTrack: {
-    height: 7,
+    height: 6,
     borderRadius: 999,
     backgroundColor: "#F0F0F0",
     overflow: "hidden",
-    marginTop: 18,
   },
   modalProgressFill: {
     height: "100%",
@@ -997,11 +1128,11 @@ const styles = StyleSheet.create({
   },
   modalStartButton: {
     height: 52,
-    borderRadius: 15,
+    borderRadius: 14,
     backgroundColor: PRIMARY,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 18,
+    marginTop: 14,
   },
   modalStartButtonDisabled: {
     backgroundColor: "#D2D2D2",
@@ -1009,6 +1140,6 @@ const styles = StyleSheet.create({
   modalStartText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "900",
+    fontWeight: "800",
   },
 });

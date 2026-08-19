@@ -85,8 +85,8 @@ function normalizeMediaUrl(url: string): string {
   return `${API_BASE_URL}${url.startsWith("/") ? "" : "/"}${url}`;
 }
 
-function firstBodyImageUrl(body?: string): string | undefined {
-  return body?.match(/<img[^>]+src=["']([^"']+)["']/i)?.[1];
+function bodyImageUrls(body?: string): string[] {
+  return Array.from(body?.matchAll(/<img[^>]+src=["']([^"']+)["']/gi) ?? [], (match) => match[1]);
 }
 
 function normalizeMedia(raw: any): any[] {
@@ -94,8 +94,8 @@ function normalizeMedia(raw: any): any[] {
   const list = Array.isArray(media) ? media : [media];
   if (raw.imageUrl) list.push(raw.imageUrl);
   if (raw.thumbnailUrl) list.push(raw.thumbnailUrl);
-  const bodyImageUrl = firstBodyImageUrl(raw.body);
-  if (bodyImageUrl) list.push(bodyImageUrl);
+  list.push(...bodyImageUrls(raw.body));
+  const seen = new Set<string>();
   return list
     .map((item: any) =>
       typeof item === "string"
@@ -107,7 +107,11 @@ function normalizeMedia(raw: any): any[] {
               : undefined,
           },
     )
-    .filter((item: any) => !!item.url);
+    .filter((item: any) => {
+      if (!item.url || seen.has(item.url)) return false;
+      seen.add(item.url);
+      return true;
+    });
 }
 
 function normalizePost(raw: any): Post {
@@ -167,6 +171,11 @@ export const postsApi = {
 
   addPost: async (post: { title: string; body: string; categoryId: string; mediaIds?: string[] }): Promise<Post> => {
     const res = await apiClient.post("/api/boards", post);
+    return normalizePost(res.data);
+  },
+
+  updatePost: async ({ id, ...post }: { id: string; title: string; body: string; categoryId: string; mediaIds?: string[] }): Promise<Post> => {
+    const res = await apiClient.patch(`/api/boards/${id}`, post);
     return normalizePost(res.data);
   },
 

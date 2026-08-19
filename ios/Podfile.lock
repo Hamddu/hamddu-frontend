@@ -248,6 +248,8 @@ PODS:
     - Yoga
   - ExpoAsset (55.0.18):
     - ExpoModulesCore
+  - ExpoBlur (55.0.17):
+    - ExpoModulesCore
   - ExpoClipboard (55.0.15):
     - ExpoModulesCore
   - ExpoDevice (55.0.19):
@@ -257,6 +259,8 @@ PODS:
   - ExpoFileSystem (55.0.24):
     - ExpoModulesCore
   - ExpoFont (55.0.8):
+    - ExpoModulesCore
+  - ExpoGlassEffect (55.0.11):
     - ExpoModulesCore
   - ExpoImageManipulator (55.0.19):
     - ExpoModulesCore
@@ -3200,11 +3204,13 @@ DEPENDENCIES:
   - expo-dev-menu (from `../node_modules/expo-dev-menu`)
   - expo-dev-menu-interface (from `../node_modules/expo-dev-menu-interface/ios`)
   - ExpoAsset (from `../node_modules/expo-asset/ios`)
+  - ExpoBlur (from `../node_modules/expo-blur/ios`)
   - ExpoClipboard (from `../node_modules/expo-clipboard/ios`)
   - ExpoDevice (from `../node_modules/expo-device/ios`)
   - "ExpoDomWebView (from `../node_modules/@expo/dom-webview/ios`)"
   - ExpoFileSystem (from `../node_modules/expo-file-system/ios`)
   - ExpoFont (from `../node_modules/expo-font/ios`)
+  - ExpoGlassEffect (from `../node_modules/expo-glass-effect/ios`)
   - ExpoImageManipulator (from `../node_modules/expo-image-manipulator/ios`)
   - ExpoImagePicker (from `../node_modules/expo-image-picker/ios`)
   - ExpoKeepAwake (from `../node_modules/expo-keep-awake/ios`)
@@ -3347,6 +3353,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-dev-menu-interface/ios"
   ExpoAsset:
     :path: "../node_modules/expo-asset/ios"
+  ExpoBlur:
+    :path: "../node_modules/expo-blur/ios"
   ExpoClipboard:
     :path: "../node_modules/expo-clipboard/ios"
   ExpoDevice:
@@ -3357,6 +3365,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-file-system/ios"
   ExpoFont:
     :path: "../node_modules/expo-font/ios"
+  ExpoGlassEffect:
+    :path: "../node_modules/expo-glass-effect/ios"
   ExpoImageManipulator:
     :path: "../node_modules/expo-image-manipulator/ios"
   ExpoImagePicker:
@@ -3563,11 +3573,13 @@ SPEC CHECKSUMS:
   expo-dev-menu: 677c1c499c1285e36f28f9f568df816c40935857
   expo-dev-menu-interface: 833795f4c98a674d36cbc12b11b21756c38e01e8
   ExpoAsset: 42278ae3d585ab9bf5a223e7979d5365c348cffc
+  ExpoBlur: 1050576a9c8bd37c8e800852a981ab56b737e353
   ExpoClipboard: 0e4b587fc6b5c5996b4ad4e5804d509e90aa6c75
   ExpoDevice: a574891cc954723e53062a2d69ec55f6d8196641
   ExpoDomWebView: b2e9d601f9cb77d3c97da73234e175b64be91928
   ExpoFileSystem: b16ad358dff1dd561f561d8ca0bf22cf00ddad40
   ExpoFont: a7e34a75bdfb703fa07a0e87807f836236608c76
+  ExpoGlassEffect: 2dedac2fe817f9b02d0dad29ce0aef7afebc5cd4
   ExpoImageManipulator: 8a11e240d5faa9a49a0ee88ce637d740412eabae
   ExpoImagePicker: f82edc16bb8eeb6260c2759b0015afc0ab45a3d0
   ExpoKeepAwake: d0eb7a0719500d2a43fbf29b6f79e84d70c75ebf

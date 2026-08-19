@@ -1,5 +1,6 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import {
+  Animated,
   View,
   Text,
   StyleSheet,
@@ -11,10 +12,15 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  RefreshControl,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCounterStore, CounterProject, RowRecord } from "../store/counterStore";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import RowBadgeActive from "../../assets/counter/row-badge-active.svg";
+import RowBadgeDisabled from "../../assets/counter/row-badge-disabled.svg";
 
 // ── 드럼 숫자 ──────────────────────────────────────────────
 function DrumDigit({ digit }: { digit: number }) {
@@ -22,6 +28,18 @@ function DrumDigit({ digit }: { digit: number }) {
     <View style={drumStyles.reel}>
       <Text style={drumStyles.digit}>{digit}</Text>
     </View>
+  );
+}
+
+function CounterHandle({ rotation, reverse = false }: { rotation: Animated.Value; reverse?: boolean }) {
+  const rotateX = rotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: reverse ? ["0deg", "-360deg"] : ["0deg", "360deg"],
+  });
+  return (
+    <Animated.View style={[styles.drumHandle, reverse && styles.drumHandleRight, { transform: [{ perspective: 600 }, { rotateX }] }]}>
+      {[0, 1, 2, 3, 4].map((ridge) => <View key={ridge} style={styles.handleRidge} />)}
+    </Animated.View>
   );
 }
 
@@ -42,7 +60,11 @@ function CounterDetail({
   const [saveModal, setSaveModal] = useState(false);
   const [projectName, setProjectName] = useState(project.name);
   const [editingName, setEditingName] = useState(false);
+  const handleRotation = useRef(new Animated.Value(0)).current;
+  const { width } = useWindowDimensions();
   const targetRow = project.targetRow ?? 0;
+  const drumWidth = Math.min(width - 44, 331);
+  const digitGap = Math.max(12, (drumWidth - 232) / 3);
 
   const tens = Math.floor((stitch % 100) / 10);
   const ones = stitch % 10;
@@ -77,7 +99,15 @@ function CounterDetail({
   };
 
   const handlePlusOne = () => {
-    setStitch(stitch + 1);
+    setStitch((current) => current + 1);
+    handleRotation.stopAnimation(() => {
+      handleRotation.setValue(0);
+      Animated.timing(handleRotation, {
+        toValue: 1,
+        duration: 320,
+        useNativeDriver: true,
+      }).start();
+    });
   };
 
   const handleSave = () => {
@@ -111,16 +141,17 @@ function CounterDetail({
   const sortedRecords = displayRecords.sort((a, b) => b.row - a.row);
 
   return (
-    <SafeAreaView style={styles.flex}>
+    <SafeAreaView style={styles.detailSafeArea}>
       {/* 헤더 */}
       <View style={styles.detailHeader}>
         <TouchableOpacity
           onPress={handleBack}
           style={styles.backBtn}
           activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="프로젝트 목록으로 돌아가기"
         >
-          <Text style={styles.backBtnText}>‹</Text>
-          <Text style={styles.backBtnLabel}>뒤로</Text>
+          <Ionicons name="chevron-back" size={24} color={INK1} />
         </TouchableOpacity>
         {editingName ? (
           <TextInput
@@ -134,84 +165,71 @@ function CounterDetail({
             returnKeyType="done"
           />
         ) : (
-          <TouchableOpacity onPress={() => setEditingName(true)} activeOpacity={0.7} style={styles.detailTitleBtn}>
+          <TouchableOpacity
+            onPress={() => setEditingName(true)}
+            activeOpacity={0.7}
+            style={styles.detailTitleBtn}
+            accessibilityRole="button"
+            accessibilityLabel="프로젝트 이름 수정"
+          >
             <Text style={styles.detailTitle}>{projectName}</Text>
-            <Text style={styles.detailTitleEdit}>✎</Text>
           </TouchableOpacity>
         )}
         <View style={{ width: 56 }} />
       </View>
 
       <FlatList
+        style={styles.detailList}
         data={sortedRecords}
         keyExtractor={(item) => String(item.row)}
         contentContainerStyle={styles.detailContent}
         ListHeaderComponent={
           <>
-            {/* 단 표시 */}
-            <View style={styles.rowDisplay}>
-              <View>
-                <Text style={styles.rowLabel}>현재 단</Text>
-                <View style={styles.rowValueRow}>
-                  <Text style={styles.rowValue}>{row}</Text>
-                  <Text style={styles.rowUnit}>단</Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                style={styles.nextRowBtn}
-                onPress={() => handleNextRow()}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.nextRowBtnText}>→ 다음 단으로</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* 드럼 카운터 */}
-            <View style={styles.drumWrapper}>
-              <View style={styles.drum}>
-                <View style={styles.drumCap} />
-                <View style={styles.drumCenter}>
-                  <View style={styles.drumScreen}>
-                    <DrumDigit digit={tens} />
-                    <DrumDigit digit={ones} />
+            <View style={styles.counterHero}>
+              <View style={styles.drumWrapper}>
+                <View style={[styles.drum, { width: drumWidth }]}>
+                  <CounterHandle rotation={handleRotation} />
+                  <View style={styles.drumCenter}>
+                    <View style={[styles.drumScreen, { gap: digitGap }]}>
+                      <DrumDigit digit={tens} />
+                      <DrumDigit digit={ones} />
+                    </View>
                   </View>
-                  <Text style={styles.drumLabel}>STITCH</Text>
-                </View>
-                <View style={[styles.drumCap, styles.drumCapRight]}>
-                  <View style={styles.drumHole} />
+                  <CounterHandle rotation={handleRotation} reverse />
                 </View>
               </View>
-            </View>
 
-            {/* 목표 단수 진행 */}
-            {targetRow > 0 && (
-              <View style={styles.targetRow}>
-                <View style={styles.targetBar}>
-                  <View style={[styles.targetFill, { width: `${Math.min((row / targetRow) * 100, 100)}%` as any }]} />
-                </View>
-                <Text style={styles.targetLabel}>{row} / {targetRow}단</Text>
+              <View style={styles.counterBtns}>
+                <TouchableOpacity
+                  style={styles.minusBtn}
+                  onPress={() => setStitch(Math.max(0, stitch - 1))}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel="한 코 빼기"
+                >
+                  <Text style={styles.minusBtnText}>-</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.plusBtn}
+                  onPress={handlePlusOne}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel="한 코 더하기"
+                >
+                  <Text style={styles.plusBtnText}>한 코 +1</Text>
+                </TouchableOpacity>
               </View>
-            )}
 
-            {/* +/- 버튼 */}
-            <View style={styles.counterBtns}>
-              <TouchableOpacity
-                style={styles.minusBtn}
-                onPress={() => setStitch(Math.max(0, stitch - 1))}
-                activeOpacity={0.75}
-              >
-                <Text style={styles.minusBtnText}>−</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.plusBtn}
-                onPress={handlePlusOne}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.plusBtnText}>+ 한 코 +1</Text>
-              </TouchableOpacity>
+              {targetRow > 0 && (
+                <View style={styles.targetRow}>
+                  <View style={styles.targetBar}>
+                    <View style={[styles.targetFill, { width: `${Math.min((row / targetRow) * 100, 100)}%` as any }]} />
+                  </View>
+                  <Text style={styles.targetLabel}>{row} / {targetRow}단</Text>
+                </View>
+              )}
             </View>
 
-            {/* 단별 기록 헤더 */}
             <View style={styles.logHeader}>
               <Text style={styles.logTitle}>단별 기록</Text>
               <Text style={styles.logCount}>{sortedRecords.length}단 저장됨</Text>
@@ -220,9 +238,11 @@ function CounterDetail({
         }
         renderItem={({ item }) => {
           const isCurrent = item.row === row;
+          const Badge = isCurrent ? RowBadgeActive : RowBadgeDisabled;
           return (
             <View style={[styles.logRow, isCurrent && styles.logRowActive]}>
-              <View style={[styles.logBadge, isCurrent && styles.logBadgeActive]}>
+              <View style={styles.logBadge}>
+                <Badge width={54} height={56} />
                 <Text style={[styles.logBadgeText, isCurrent && styles.logBadgeTextActive]}>
                   {item.row}단
                 </Text>
@@ -237,6 +257,12 @@ function CounterDetail({
           );
         }}
         ItemSeparatorComponent={() => <View style={styles.logDivider} />}
+        ListFooterComponent={
+          <TouchableOpacity style={styles.nextRowFooter} onPress={() => handleNextRow()} activeOpacity={0.75}>
+            <Text style={styles.nextRowFooterText}>다음 단으로</Text>
+            <Ionicons name="arrow-forward" size={16} color={PRIMARY} />
+          </TouchableOpacity>
+        }
       />
 
       {/* 저장 모달 */}
@@ -290,6 +316,16 @@ export default function CounterScreen() {
   const [newModal, setNewModal] = useState(false);
   const [newName, setNewName] = useState("새 프로젝트");
   const [newTarget, setNewTarget] = useState("");
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await useCounterStore.persist.rehydrate();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleNewProject = () => {
     setNewName("새 프로젝트");
@@ -338,22 +374,19 @@ export default function CounterScreen() {
 
   return (
     <SafeAreaView style={styles.flex}>
-      <View style={styles.listHeader}>
-        <View>
-          <Text style={styles.screenTitle}>코카운터</Text>
-          <Text style={styles.screenSubtitle}>
-            진행 중인 프로젝트 {projects.length}개
-          </Text>
-        </View>
-        <TouchableOpacity style={styles.addBtn} onPress={handleNewProject} activeOpacity={0.85}>
-          <Text style={styles.addBtnText}>+</Text>
-        </TouchableOpacity>
-      </View>
-
       <FlatList
         data={projects}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
+        alwaysBounceVertical
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={() => void handleRefresh()}
+            tintColor="#FF7325"
+            colors={["#FF7325"]}
+          />
+        }
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
             <Text style={styles.emptyIcon}>🧶</Text>
@@ -390,7 +423,7 @@ export default function CounterScreen() {
             >
               <Text style={styles.deleteProjectText}>삭제</Text>
             </TouchableOpacity>
-            <Text style={styles.chevron}>›</Text>
+            <Ionicons name="chevron-forward" size={20} color={INK3} />
           </TouchableOpacity>
         )}
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
@@ -402,6 +435,10 @@ export default function CounterScreen() {
           ) : null
         }
       />
+
+      <TouchableOpacity style={styles.addBtn} onPress={handleNewProject} activeOpacity={0.85}>
+        <Text style={styles.addBtnText}>+</Text>
+      </TouchableOpacity>
 
       <Modal visible={newModal} transparent animationType="slide">
         <KeyboardAvoidingView
@@ -457,23 +494,20 @@ const LINE_STRONG = "#D8D8D8";
 
 const drumStyles = StyleSheet.create({
   reel: {
-    width: 50,
-    height: 56,
-    borderRadius: 4,
-    backgroundColor: "#F2F2EE",
+    width: 73,
+    height: 94,
+    borderRadius: 10,
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
   },
   digit: {
-    fontSize: 34,
-    fontWeight: "700",
+    fontSize: 60,
+    lineHeight: 72,
+    fontWeight: "800",
     color: INK1,
     fontVariant: ["tabular-nums"],
+    letterSpacing: -1.8,
   },
 });
 
@@ -481,24 +515,15 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: "#FFFFFF" },
 
   // 리스트
-  listHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 12,
-  },
-  screenTitle: { fontSize: 22, fontWeight: "800", color: INK1, letterSpacing: -0.4 },
-  screenSubtitle: { fontSize: 12, color: INK3, marginTop: 2 },
   addBtn: {
+    position: "absolute", right: 20, bottom: 102,
     width: 40, height: 40, borderRadius: 12,
     backgroundColor: PRIMARY, alignItems: "center", justifyContent: "center",
     shadowColor: PRIMARY_DEEP, shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 1, shadowRadius: 0, elevation: 3,
   },
   addBtnText: { color: "#fff", fontSize: 22, fontWeight: "800", lineHeight: 24 },
-  listContent: { paddingHorizontal: 20, paddingBottom: 20 },
+  listContent: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 130 },
   emptyWrap: { alignItems: "center", paddingTop: 80 },
   emptyIcon: { fontSize: 48, marginBottom: 16 },
   emptyText: { fontSize: 16, fontWeight: "800", color: INK1, marginBottom: 6 },
@@ -522,7 +547,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   deleteProjectText: { fontSize: 12, fontWeight: "700", color: "#E55B4B" },
-  chevron: { fontSize: 18, color: INK3 },
   newProjectBtn: {
     marginTop: 10, borderWidth: 2, borderStyle: "dashed",
     borderColor: LINE_STRONG, borderRadius: 16, padding: 16, alignItems: "center",
@@ -530,86 +554,125 @@ const styles = StyleSheet.create({
   newProjectBtnText: { fontSize: 14, fontWeight: "700", color: INK3 },
 
   // 상세
+  detailSafeArea: { flex: 1, backgroundColor: "#FFF8F2" },
   detailHeader: {
-    flexDirection: "row", alignItems: "center",
-    paddingHorizontal: 16, paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: LINE, backgroundColor: "#fff",
+    height: 58,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    backgroundColor: "#FFF8F2",
   },
-  backBtn: { flexDirection: "row", alignItems: "center", gap: 2, paddingRight: 8 },
-  backBtnText: { fontSize: 28, color: PRIMARY, lineHeight: 32 },
-  backBtnLabel: { fontSize: 16, color: PRIMARY, fontWeight: "600" },
+  backBtn: { width: 56, height: 44, alignItems: "flex-start", justifyContent: "center" },
   detailTitleBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 },
-  detailTitle: { fontSize: 17, fontWeight: "800", color: INK1 },
-  detailTitleEdit: { fontSize: 13, color: INK3 },
-  detailTitleInput: { flex: 1, fontSize: 17, fontWeight: "800", color: INK1, textAlign: "center", borderBottomWidth: 1.5, borderBottomColor: PRIMARY, paddingVertical: 2 },
-  detailContent: { padding: 20, paddingTop: 8 },
-  rowDisplay: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingVertical: 12, marginBottom: 4,
-  },
-  rowLabel: { fontSize: 11, color: INK3, fontWeight: "700", letterSpacing: 0.4 },
-  rowValueRow: { flexDirection: "row", alignItems: "baseline", gap: 4, marginTop: 2 },
-  rowValue: { fontSize: 36, fontWeight: "800", color: PRIMARY, letterSpacing: -1 },
-  rowUnit: { fontSize: 14, color: INK3, fontWeight: "700" },
-  nextRowBtn: {
-    paddingHorizontal: 16, height: 44, borderRadius: 12,
-    backgroundColor: PRIMARY_SOFT, alignItems: "center", justifyContent: "center",
-  },
-  nextRowBtnText: { fontSize: 13, fontWeight: "800", color: PRIMARY_DEEP },
-  drumWrapper: { alignItems: "center", marginBottom: 20, marginTop: 8 },
+  detailTitle: { fontSize: 19, fontWeight: "800", color: INK1 },
+  detailTitleInput: { flex: 1, fontSize: 19, fontWeight: "800", color: INK1, textAlign: "center", borderBottomWidth: 1.5, borderBottomColor: PRIMARY, paddingVertical: 2 },
+  detailList: { flex: 1, backgroundColor: "#FFFFFF" },
+  detailContent: { paddingBottom: 130 },
+  counterHero: { paddingTop: 31, paddingBottom: 38, backgroundColor: "#FFF8F2" },
+  drumWrapper: { alignItems: "center", marginBottom: 44 },
   drum: {
-    flexDirection: "row", height: 120, borderRadius: 18, overflow: "hidden",
-    shadowColor: "#000", shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18, shadowRadius: 16, elevation: 8,
+    height: 190,
+    flexDirection: "row",
+    alignItems: "center",
   },
-  drumCap: { width: 48, backgroundColor: "#F0F0F0" },
-  drumCapRight: { alignItems: "center", justifyContent: "center" },
-  drumHole: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#222" },
+  drumHandle: {
+    width: 43,
+    height: 174,
+    borderTopLeftRadius: 30,
+    borderBottomLeftRadius: 30,
+    borderTopRightRadius: 4,
+    borderBottomRightRadius: 4,
+    backgroundColor: "#EFE6DF",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+  },
+  drumHandleRight: {
+    borderTopLeftRadius: 4,
+    borderBottomLeftRadius: 4,
+    borderTopRightRadius: 30,
+    borderBottomRightRadius: 30,
+  },
+  handleRidge: { width: 26, height: 10, borderRadius: 4, backgroundColor: "#C4BDB8" },
   drumCenter: {
-    flex: 1, backgroundColor: PRIMARY, alignItems: "center", justifyContent: "center", gap: 6,
+    flex: 1,
+    height: 190,
+    borderRadius: 10,
+    backgroundColor: PRIMARY,
+    alignItems: "center",
+    justifyContent: "center",
   },
   drumScreen: {
-    flexDirection: "row", gap: 4, backgroundColor: INK1, padding: 6, borderRadius: 6,
+    flexDirection: "row",
   },
-  drumLabel: { fontSize: 10, fontWeight: "800", color: "#fff", letterSpacing: 2, opacity: 0.85 },
-  counterBtns: { flexDirection: "row", gap: 10, marginBottom: 20 },
+  counterBtns: { flexDirection: "row", gap: 14, marginHorizontal: 26 },
   minusBtn: {
-    width: 64, height: 64, borderRadius: 16, backgroundColor: "#fff",
-    borderWidth: 1, borderColor: LINE, alignItems: "center", justifyContent: "center",
+    width: 118,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  minusBtnText: { fontSize: 26, fontWeight: "800", color: INK2 },
+  minusBtnText: { fontSize: 19, fontWeight: "700", color: INK1 },
   plusBtn: {
-    flex: 1, height: 64, borderRadius: 16, backgroundColor: PRIMARY,
-    alignItems: "center", justifyContent: "center",
-    shadowColor: PRIMARY_DEEP, shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 1, shadowRadius: 0, elevation: 5,
+    flex: 1,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: PRIMARY,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  plusBtnText: { fontSize: 16, fontWeight: "800", color: "#fff" },
+  plusBtnText: { fontSize: 19, fontWeight: "700", color: "#FFFFFF", letterSpacing: -0.57 },
   logHeader: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 23,
+    paddingTop: 24,
+    marginBottom: 12,
+    backgroundColor: "#FFFFFF",
   },
-  logTitle: { fontSize: 13, fontWeight: "800", color: INK1 },
-  logCount: { fontSize: 11, color: INK3 },
+  logTitle: { fontSize: 15, fontWeight: "600", color: INK1 },
+  logCount: { fontSize: 13, fontWeight: "500", color: "rgba(26,26,26,0.5)" },
   logRow: {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    paddingVertical: 12, paddingHorizontal: 14,
-    backgroundColor: "#fff", borderRadius: 14,
+    height: 72,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 22,
+    marginHorizontal: 23,
+    paddingHorizontal: 10,
+    backgroundColor: "#FFF8F2",
+    borderRadius: 10,
   },
-  logRowActive: { backgroundColor: PRIMARY_SOFT },
-  logDivider: { height: 1, backgroundColor: LINE },
+  logRowActive: { backgroundColor: "#FFF8F2" },
+  logDivider: { height: 12 },
   logBadge: {
-    width: 44, height: 24, borderRadius: 6,
-    backgroundColor: "#F2F2F2", alignItems: "center", justifyContent: "center",
+    width: 54,
+    height: 56,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  logBadgeActive: { backgroundColor: PRIMARY },
-  logBadgeText: { fontSize: 11, fontWeight: "800", color: INK2 },
-  logBadgeTextActive: { color: "#fff" },
-  logStitch: { flex: 1, fontSize: 14, fontWeight: "700", color: INK1 },
-  progressTag: { backgroundColor: INK1, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
-  progressTagText: { fontSize: 10, fontWeight: "700", color: "#fff" },
+  logBadgeText: { position: "absolute", fontSize: 15, fontWeight: "700", color: "#85807D" },
+  logBadgeTextActive: { color: "#FFFFFF" },
+  logStitch: { flex: 1, fontSize: 15, fontWeight: "500", color: INK1 },
+  progressTag: { backgroundColor: "#FFFFFF", paddingHorizontal: 16, paddingVertical: 6, borderRadius: 30 },
+  progressTagText: { fontSize: 15, fontWeight: "500", color: INK1 },
+  nextRowFooter: {
+    height: 48,
+    marginHorizontal: 23,
+    marginTop: 14,
+    borderRadius: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#F7F8FA",
+  },
+  nextRowFooterText: { fontSize: 14, fontWeight: "700", color: PRIMARY },
 
   // 목표 코수
-  targetRow: { marginTop: -12, marginBottom: 16, gap: 6 },
+  targetRow: { marginHorizontal: 26, marginTop: 16, gap: 6 },
   targetBar: { height: 6, backgroundColor: LINE, borderRadius: 3, overflow: "hidden" },
   targetFill: { height: "100%", backgroundColor: PRIMARY, borderRadius: 3 },
   targetLabel: { fontSize: 11, fontWeight: "700", color: INK3, textAlign: "right" },

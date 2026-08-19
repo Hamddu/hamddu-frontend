@@ -10,6 +10,8 @@ export interface UserProfile {
   gender: string | null;
   interests: string | null;
   ability: string | null;
+  profileImageUrl: string | null;
+  profileMediaId: string | null;
   surveyCompleted: boolean;
   createdAt: string;
 }
@@ -26,10 +28,12 @@ export async function getMyProfile(): Promise<UserProfile> {
   return res.data;
 }
 
-export async function updateNickname(nickname: string): Promise<UserProfile> {
-  const res = await apiClient.patch('/api/users/me', { nickname });
+export async function updateProfile(payload: { nickname?: string; profileMediaId?: string | null }): Promise<UserProfile> {
+  const res = await apiClient.patch('/api/users/me', payload);
   return res.data;
 }
+
+export const updateNickname = (nickname: string) => updateProfile({ nickname });
 
 export async function submitSurvey(payload: SurveyPayload): Promise<void> {
   await apiClient.post('/api/users/me/survey', payload);

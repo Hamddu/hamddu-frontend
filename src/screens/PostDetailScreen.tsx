@@ -6,18 +6,22 @@ import {
   KeyboardAvoidingView,
   Platform,
   FlatList,
+  RefreshControl,
   ActivityIndicator,
   TouchableOpacity,
   Image,
   useWindowDimensions,
   Alert,
   Share,
+  Modal,
 } from "react-native";
-import { Text, TextInput, Button, Dialog, Portal, RadioButton } from "react-native-paper";
+import { Text, TextInput } from "react-native-paper";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import RenderHtml from "react-native-render-html";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import type { RouteProp } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { useDeletePost, usePost, useToggleLike } from "../hooks/usePosts";
@@ -26,6 +30,7 @@ import { CommunityStackParamList } from "../types/navigation";
 import CommentItem from "../components/CommentItem";
 import { getMyProfile } from "../api/users.api";
 import { commentsApi, countComments, postsApi, ReportReason } from "../services/api";
+import { getAvatarColors } from "../utils/avatarColors";
 
 const PRIMARY = "#FF7325";
 const PRIMARY_SOFT = "#FFE6D6";
@@ -72,15 +77,16 @@ function getApiErrorMessage(error: unknown): string {
 
 export default function PostDetailScreen() {
   const route = useRoute<PostDetailRouteProp>();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<CommunityStackParamList>>();
   const { postId } = route.params;
   const headerHeight = useHeaderHeight();
 
-  const { data: post, isLoading: postLoading, isError: postError, refetch: refetchPost } = usePost(postId);
+  const { data: post, isLoading: postLoading, isError: postError, isRefetching: postRefreshing, refetch: refetchPost } = usePost(postId);
   const {
     data: comments,
     isLoading: commentsLoading,
     isError: commentsError,
+    isRefetching: commentsRefreshing,
     refetch: refetchComments,
   } = useComments(postId);
   const { data: myProfile } = useQuery({ queryKey: ["profile", "me"], queryFn: getMyProfile });
@@ -96,6 +102,7 @@ export default function PostDetailScreen() {
   const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
   const [reportReason, setReportReason] = useState<ReportReason>("spam");
   const [reportDescription, setReportDescription] = useState("");
+  const [postMenuOpen, setPostMenuOpen] = useState(false);
   const totalCommentCount = comments ? countComments(comments) : (post?.commentCount ?? 0);
 
   const reportMutation = useMutation({
@@ -218,7 +225,8 @@ export default function PostDetailScreen() {
   const authorName = post.author?.nickname ?? "익명";
   const isMine = !!myProfile?.id && post.author?.id === myProfile.id;
   const avatarText = authorName.slice(0, 2);
-  const media = (post as any).media ?? [];
+  const avatarColors = getAvatarColors(post.author?.id ?? authorName);
+  const media = ((post as any).media ?? []).filter((item: any) => !post.body.includes(item.url ?? item));
   const tags = (post as any).tags ?? [];
   const authorMeta = [
     getTimeAgo(post.createdAt),
@@ -235,25 +243,30 @@ export default function PostDetailScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        onScrollBeginDrag={() => setPostMenuOpen(false)}
+        alwaysBounceVertical
+        refreshControl={
+          <RefreshControl
+            refreshing={postRefreshing || commentsRefreshing}
+            onRefresh={() => {
+              void Promise.all([refetchPost(), refetchComments()]);
+            }}
+            tintColor="#FF7325"
+            colors={["#FF7325"]}
+          />
+        }
       >
         <View style={styles.articleCard}>
           <View style={styles.authorSection}>
             <View style={styles.authorLeft}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{avatarText}</Text>
+              <View style={[styles.avatar, { backgroundColor: avatarColors.backgroundColor }]}>
+                <Text style={[styles.avatarText, { color: avatarColors.color }]}>{avatarText}</Text>
               </View>
               <View style={styles.authorInfo}>
                 <Text style={styles.authorName} numberOfLines={1}>{authorName}</Text>
                 <Text style={styles.authorMeta}>{authorMeta}</Text>
               </View>
             </View>
-            <TouchableOpacity
-              style={styles.headerReportBtn}
-              onPress={isMine ? handleDeletePost : () => openReportDialog({ type: "post", id: post.id })}
-              disabled={deletePostMutation.isPending}
-            >
-              <Text style={styles.headerReportText}>{isMine ? "삭제" : "신고"}</Text>
-            </TouchableOpacity>
           </View>
 
           <View style={styles.bodySection}>
@@ -286,7 +299,7 @@ export default function PostDetailScreen() {
                 <Image
                   key={m.url ?? i}
                   source={{ uri: m.url ?? m }}
-                  style={styles.mediaImage}
+                  style={[styles.mediaImage, { width: contentWidth - 40 }]}
                   resizeMode="cover"
                 />
               ))}
@@ -295,18 +308,76 @@ export default function PostDetailScreen() {
 
           <View style={styles.actionBar}>
             <TouchableOpacity onPress={handleLikePress} style={styles.actionBtn} activeOpacity={0.75}>
-              <Text style={[styles.actionIcon, post.likedByMe && { color: PRIMARY }]}>
-                {post.likedByMe ? "♥" : "♡"}
-              </Text>
+              <Ionicons
+                name={post.likedByMe ? "heart" : "heart-outline"}
+                size={18}
+                color={post.likedByMe ? PRIMARY : INK3}
+              />
+              <Text style={[styles.actionLabel, post.likedByMe && { color: PRIMARY }]}>좋아요</Text>
               <Text style={styles.actionCount}>{post.likeCount}</Text>
             </TouchableOpacity>
             <View style={styles.actionBtn}>
-              <Text style={styles.actionIcon}>💬</Text>
+              <Ionicons name="chatbubble-outline" size={17} color={INK3} />
+              <Text style={styles.actionLabel}>댓글</Text>
               <Text style={styles.actionCount}>{totalCommentCount}</Text>
             </View>
-            <TouchableOpacity style={styles.actionBtn} onPress={handleShare} activeOpacity={0.75}>
-              <Text style={styles.actionLabel}>공유</Text>
+            <TouchableOpacity
+              style={styles.moreButton}
+              onPress={() => setPostMenuOpen((open) => !open)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="게시글 메뉴"
+            >
+              <Ionicons name="ellipsis-vertical" size={20} color={INK2} />
             </TouchableOpacity>
+            {postMenuOpen && (
+              <View style={styles.postMenu}>
+                <TouchableOpacity
+                  style={styles.postMenuItem}
+                  onPress={() => {
+                    setPostMenuOpen(false);
+                    void handleShare();
+                  }}
+                >
+                  <Ionicons name="share-outline" size={18} color={INK2} />
+                  <Text style={styles.postMenuText}>공유</Text>
+                </TouchableOpacity>
+                {isMine && (
+                  <>
+                    <View style={styles.postMenuDivider} />
+                    <TouchableOpacity
+                      style={styles.postMenuItem}
+                      onPress={() => {
+                        setPostMenuOpen(false);
+                        navigation.navigate("AddPost", { postId: post.id });
+                      }}
+                    >
+                      <Ionicons name="create-outline" size={18} color={INK2} />
+                      <Text style={styles.postMenuText}>수정</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+                <View style={styles.postMenuDivider} />
+                <TouchableOpacity
+                  style={styles.postMenuItem}
+                  disabled={deletePostMutation.isPending}
+                  onPress={() => {
+                    setPostMenuOpen(false);
+                    if (isMine) handleDeletePost();
+                    else openReportDialog({ type: "post", id: post.id });
+                  }}
+                >
+                  <Ionicons
+                    name={isMine ? "trash-outline" : "flag-outline"}
+                    size={18}
+                    color={isMine ? "#E5484D" : INK2}
+                  />
+                  <Text style={[styles.postMenuText, isMine && styles.postMenuDeleteText]}>
+                    {isMine ? "삭제" : "신고"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
 
@@ -367,80 +438,82 @@ export default function PostDetailScreen() {
           <TextInput
             value={commentText}
             onChangeText={setCommentText}
-            placeholder={replyTo ? "답글을 남겨주세요..." : "따뜻한 댓글을 남겨주세요..."}
-            mode="outlined"
+            placeholder={replyTo ? "포근한 답글 한 코 남겨주세요..." : "포근한 댓글 한 코 남겨주세요..."}
+            mode="flat"
             style={styles.commentInput}
-            outlineColor={LINE}
-            activeOutlineColor={PRIMARY}
+            underlineColor="transparent"
+            activeUnderlineColor="transparent"
             multiline
             maxLength={500}
             theme={{ colors: { onSurfaceVariant: INK3 } }}
           />
-          <Button
-            mode="contained"
+          <TouchableOpacity
             onPress={handleAddComment}
-            loading={addCommentMutation.isPending}
             disabled={!commentText.trim() || addCommentMutation.isPending}
-            style={styles.submitButton}
-            buttonColor={PRIMARY}
-            labelStyle={styles.submitLabel}
+            style={[styles.submitButton, !commentText.trim() && styles.submitButtonDisabled]}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="댓글 등록"
           >
-            전송
-          </Button>
+            {addCommentMutation.isPending ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Ionicons name="arrow-up" size={21} color="#fff" />
+            )}
+          </TouchableOpacity>
         </View>
       </View>
 
-      <Portal>
+      <Modal visible={!!reportTarget} transparent animationType="slide" onRequestClose={() => setReportTarget(null)}>
         <KeyboardAvoidingView
-          style={styles.dialogKeyboardAvoider}
+          style={styles.reportBackdrop}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
-          <Dialog visible={!!reportTarget} onDismiss={() => setReportTarget(null)}>
-            <Dialog.Title>{reportTarget?.type === "post" ? "게시글 신고" : "댓글 신고"}</Dialog.Title>
-            <Dialog.Content>
-              <ScrollView
-                keyboardShouldPersistTaps="handled"
-                automaticallyAdjustKeyboardInsets
-                contentContainerStyle={styles.reportContent}
-              >
-                <RadioButton.Group
-                  onValueChange={(value) => setReportReason(value as ReportReason)}
-                  value={reportReason}
-                >
-                  {REPORT_REASONS.map((reason) => (
-                    <RadioButton.Item
-                      key={reason.value}
-                      label={reason.label}
-                      value={reason.value}
-                      color={PRIMARY}
-                      labelStyle={styles.reportReasonLabel}
-                    />
-                  ))}
-                </RadioButton.Group>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setReportTarget(null)} activeOpacity={1} />
+          <View style={styles.reportSheet}>
+            <View style={styles.reportHandle} />
+            <Text style={styles.reportTitle}>
+              {reportTarget?.type === "post" ? "게시글을 신고할까요?" : "댓글을 신고할까요?"}
+            </Text>
+            <Text style={styles.reportSubtitle}>신고 사유를 선택해주세요.</Text>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.reportContent}>
+              <View style={styles.reportReasons}>
+                {REPORT_REASONS.map((reason) => (
+                  <TouchableOpacity
+                    key={reason.value}
+                    style={styles.reportReasonRow}
+                    onPress={() => setReportReason(reason.value)}
+                  >
+                    <Text style={styles.reportReasonLabel}>{reason.label}</Text>
+                    <View style={[styles.reportCheck, reportReason === reason.value && styles.reportCheckSelected]}>
+                      {reportReason === reason.value && <Ionicons name="checkmark" size={15} color="#fff" />}
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
                 <TextInput
                   value={reportDescription}
                   onChangeText={setReportDescription}
                   placeholder="상세 내용을 입력해주세요. (선택)"
-                  mode="outlined"
+                  mode="flat"
                   multiline
                   maxLength={1000}
                   style={styles.reportDescription}
-                  outlineColor={LINE}
-                  activeOutlineColor={PRIMARY}
+                  underlineColor="transparent"
+                  activeUnderlineColor="transparent"
                 />
-              </ScrollView>
-            </Dialog.Content>
-            <Dialog.Actions>
-              <Button onPress={() => setReportTarget(null)} disabled={reportMutation.isPending}>
-                취소
-              </Button>
-              <Button onPress={submitReport} loading={reportMutation.isPending} disabled={reportMutation.isPending}>
-                신고
-              </Button>
-            </Dialog.Actions>
-          </Dialog>
+            </ScrollView>
+            <View style={styles.reportActions}>
+              <TouchableOpacity style={styles.reportCancelButton} onPress={() => setReportTarget(null)}>
+                <Text style={styles.reportCancelText}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.reportSubmitButton} onPress={submitReport} disabled={reportMutation.isPending}>
+                {reportMutation.isPending ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.reportSubmitText}>신고하기</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
         </KeyboardAvoidingView>
-      </Portal>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -485,25 +558,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingTop: 12,
     paddingBottom: 112,
   },
   articleCard: {
     backgroundColor: WHITE,
-    marginHorizontal: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: LINE,
-    overflow: "hidden",
   },
   authorSection: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: LINE,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 10,
   },
   authorLeft: {
     flexDirection: "row",
@@ -511,23 +577,10 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  headerReportBtn: {
-    minHeight: 32,
-    paddingHorizontal: 11,
-    borderRadius: 16,
-    backgroundColor: SURFACE,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerReportText: {
-    fontSize: 12,
-    fontWeight: "800",
-    color: INK3,
-  },
   avatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: PRIMARY_SOFT,
     alignItems: "center",
     justifyContent: "center",
@@ -554,9 +607,9 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   bodySection: {
-    paddingHorizontal: 14,
-    paddingTop: 16,
-    paddingBottom: 14,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 20,
   },
   categoryChip: {
     alignSelf: "flex-start",
@@ -565,21 +618,21 @@ const styles = StyleSheet.create({
     color: PRIMARY_DEEP,
     backgroundColor: PRIMARY_SOFT,
     borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    marginBottom: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    marginBottom: 14,
   },
   postTitle: {
-    fontSize: 21,
+    fontSize: 24,
     fontWeight: "800",
     color: INK1,
-    lineHeight: 28,
-    marginBottom: 10,
+    lineHeight: 32,
+    marginBottom: 16,
   },
   htmlBody: {
     color: INK2,
-    fontSize: 14,
-    lineHeight: 23,
+    fontSize: 16,
+    lineHeight: 26,
   },
   tagsRow: {
     flexDirection: "row",
@@ -593,42 +646,35 @@ const styles = StyleSheet.create({
     color: PRIMARY_DEEP,
   },
   mediaContent: {
-    paddingHorizontal: 14,
-    paddingBottom: 14,
-    gap: 8,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    gap: 10,
   },
   mediaImage: {
-    width: 250,
-    height: 188,
-    borderRadius: 14,
+    height: 260,
+    borderRadius: 16,
     backgroundColor: SURFACE,
   },
   actionBar: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    marginHorizontal: 20,
+    paddingVertical: 14,
     borderTopWidth: 1,
     borderTopColor: LINE,
-    gap: 8,
+    gap: 22,
+    position: "relative",
   },
   actionBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 34,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    backgroundColor: SURFACE,
-    gap: 5,
-  },
-  actionIcon: {
-    fontSize: 13,
-    color: INK3,
+    minHeight: 32,
+    gap: 4,
   },
   actionCount: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "700",
     color: INK3,
   },
   actionLabel: {
@@ -636,19 +682,62 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: INK3,
   },
+  moreButton: {
+    width: 36,
+    height: 36,
+    marginLeft: "auto",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 18,
+  },
+  postMenu: {
+    position: "absolute",
+    right: 0,
+    bottom: 54,
+    width: 132,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: WHITE,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.14,
+    shadowRadius: 14,
+    elevation: 8,
+    zIndex: 10,
+  },
+  postMenuItem: {
+    minHeight: 42,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  postMenuText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: INK2,
+  },
+  postMenuDeleteText: {
+    color: "#E5484D",
+  },
+  postMenuDivider: {
+    height: 1,
+    marginHorizontal: 12,
+    backgroundColor: LINE,
+  },
   commentsSection: {
-    marginHorizontal: 20,
     marginTop: 12,
-    paddingTop: 16,
-    paddingBottom: 20,
-    borderTopWidth: 1,
-    borderTopColor: LINE,
+    paddingHorizontal: 20,
+    paddingTop: 22,
+    paddingBottom: 24,
+    borderTopWidth: 8,
+    borderTopColor: "#F5F5F5",
   },
   commentsHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginBottom: 8,
+    marginBottom: 14,
   },
   commentsTitle: {
     fontSize: 16,
@@ -656,10 +745,8 @@ const styles = StyleSheet.create({
     color: INK1,
   },
   commentsCount: {
-    minWidth: 24,
+    minWidth: 16,
     height: 22,
-    borderRadius: 11,
-    backgroundColor: SURFACE,
     color: INK3,
     fontSize: 12,
     fontWeight: "800",
@@ -683,7 +770,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   commentInputContainer: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 10,
     backgroundColor: WHITE,
     borderTopWidth: 1,
@@ -716,30 +803,126 @@ const styles = StyleSheet.create({
     maxHeight: 100,
     backgroundColor: SURFACE,
     fontSize: 13,
+    borderRadius: 22,
+    overflow: "hidden",
   },
   submitButton: {
-    borderRadius: 20,
-    marginBottom: 2,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    marginBottom: 4,
+    backgroundColor: PRIMARY,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  submitLabel: {
-    fontSize: 13,
-    fontWeight: "700",
+  submitButtonDisabled: {
+    backgroundColor: "#D8D8D8",
   },
   reportReasonLabel: {
     fontSize: 14,
+    fontWeight: "700",
     color: INK2,
   },
-  dialogKeyboardAvoider: {
+  reportBackdrop: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.38)",
+  },
+  reportSheet: {
+    maxHeight: "88%",
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 18,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: WHITE,
+  },
+  reportHandle: {
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#D8D8D8",
+    alignSelf: "center",
+    marginBottom: 22,
+  },
+  reportTitle: {
+    fontSize: 22,
+    lineHeight: 29,
+    fontWeight: "800",
+    color: INK1,
+  },
+  reportSubtitle: {
+    marginTop: 5,
+    marginBottom: 18,
+    fontSize: 14,
+    color: INK3,
   },
   reportContent: {
-    paddingBottom: 8,
+    paddingBottom: 14,
+  },
+  reportReasons: {
+    borderRadius: 16,
+    backgroundColor: "#F7F8FA",
+    overflow: "hidden",
+  },
+  reportReasonRow: {
+    minHeight: 50,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  reportCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: "#D0D3D8",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reportCheckSelected: {
+    borderColor: PRIMARY,
+    backgroundColor: PRIMARY,
   },
   reportDescription: {
+    minHeight: 92,
     maxHeight: 120,
-    marginTop: 8,
-    backgroundColor: WHITE,
-    fontSize: 13,
+    marginTop: 14,
+    borderRadius: 16,
+    overflow: "hidden",
+    backgroundColor: "#F7F8FA",
+    fontSize: 14,
+  },
+  reportActions: {
+    flexDirection: "row",
+    gap: 10,
+    paddingTop: 4,
+  },
+  reportCancelButton: {
+    flex: 1,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: "#F2F4F6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reportCancelText: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: INK2,
+  },
+  reportSubmitButton: {
+    flex: 2,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: PRIMARY,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reportSubmitText: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: WHITE,
   },
 });
