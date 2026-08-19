@@ -3,6 +3,8 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -19,12 +21,14 @@ import YarnLeft from "../../assets/login/yarn-left.svg";
 import YarnTop from "../../assets/login/yarn-top.svg";
 import { loginWithOAuth } from "../api/auth.api";
 import { getMyProfile } from "../api/users.api";
+import { PRIVACY_POLICY, TERMS_OF_SERVICE } from "../constants/legal";
 import { useAuthStore } from "../store/authStore";
 
 const GOOGLE_ICON = require("../../assets/login/google.png");
 
 export default function LoginScreen() {
   const [loading, setLoading] = useState<"google" | "naver" | null>(null);
+  const [legalDocument, setLegalDocument] = useState<"terms" | "privacy" | null>(null);
   const { setAccessToken, setSurveyRequired } = useAuthStore();
   const { width, height } = useWindowDimensions();
   const scale = Math.min(width / 451, height / 980);
@@ -121,9 +125,38 @@ export default function LoginScreen() {
         </TouchableOpacity>
 
         <Text style={[styles.terms, { fontSize: 15 * scale, lineHeight: 20 * scale, marginTop: 32 * scale }]}>
-          가입하면 이용약관과 개인정보처리방침에 동의하게 돼요
+          가입하면 <Text accessibilityRole="link" style={styles.termsLink} onPress={() => setLegalDocument("terms")}>이용약관</Text>과{" "}
+          <Text accessibilityRole="link" style={styles.termsLink} onPress={() => setLegalDocument("privacy")}>개인정보처리방침</Text>에 동의하게 돼요
         </Text>
       </View>
+
+      <Modal
+        visible={legalDocument !== null}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setLegalDocument(null)}
+      >
+        <SafeAreaView style={styles.legalScreen}>
+          <View style={styles.legalHeader}>
+            <Text style={styles.legalTitle}>
+              {legalDocument === "terms" ? "이용약관" : "개인정보처리방침"}
+            </Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="문서 닫기"
+              hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+              onPress={() => setLegalDocument(null)}
+            >
+              <Text style={styles.legalClose}>닫기</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={styles.legalContent}>
+            <Text style={styles.legalBody}>
+              {legalDocument === "terms" ? TERMS_OF_SERVICE : PRIVACY_POLICY}
+            </Text>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -189,4 +222,23 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
     textAlign: "center",
   },
+  termsLink: {
+    color: "rgba(0,0,0,0.55)",
+    fontWeight: "700",
+    textDecorationLine: "underline",
+  },
+  legalScreen: { flex: 1, backgroundColor: "#FFFFFF" },
+  legalHeader: {
+    height: 58,
+    paddingHorizontal: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#E8E8E8",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  legalTitle: { fontSize: 18, fontWeight: "800", color: "#1A1A1A" },
+  legalClose: { fontSize: 15, fontWeight: "700", color: "#FF7326" },
+  legalContent: { paddingHorizontal: 22, paddingTop: 22, paddingBottom: 48 },
+  legalBody: { fontSize: 14, lineHeight: 23, color: "#404040" },
 });

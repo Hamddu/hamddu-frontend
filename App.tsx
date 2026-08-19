@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Animated, Text, TouchableOpacity, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { DefaultTheme, NavigationContainer } from "@react-navigation/native";
+import { DefaultTheme, NavigationContainer, getFocusedRouteNameFromRoute } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Provider as PaperProvider } from "react-native-paper";
@@ -71,15 +71,9 @@ function TabIcon({
       style={{
         transform: [
           {
-            translateY: progress.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0, -2],
-            }),
-          },
-          {
             scale: progress.interpolate({
               inputRange: [0, 1],
-              outputRange: [1, 1.08],
+              outputRange: [1, 1.04],
             }),
           },
         ],
@@ -133,17 +127,12 @@ function HeaderBackButton({ onPress }: { onPress: () => void }) {
   );
 }
 
-function CommunityHeader({ title, onBack }: { title: string; onBack: () => void }) {
+function CommunityHeader({ onBack }: { onBack: () => void }) {
   const insets = useSafeAreaInsets();
   return (
     <View style={{ height: insets.top + 56, paddingTop: insets.top, backgroundColor: WHITE }}>
       <View style={{ height: 56, flexDirection: "row", alignItems: "center", paddingHorizontal: 14 }}>
         <HeaderBackButton onPress={onBack} />
-        <Text
-          style={{ position: "absolute", left: 56, right: 56, bottom: 16, textAlign: "center", fontSize: 17, fontWeight: "800", color: "#1A1A1A" }}
-        >
-          {title}
-        </Text>
       </View>
     </View>
   );
@@ -153,12 +142,7 @@ function CommunityStackNavigator() {
   return (
     <CommunityStack.Navigator
       screenOptions={({ navigation }) => ({
-        header: ({ options }) => (
-          <CommunityHeader
-            title={typeof options.headerTitle === "string" ? options.headerTitle : options.title ?? ""}
-            onBack={navigation.goBack}
-          />
-        ),
+        header: () => <CommunityHeader onBack={navigation.goBack} />,
         contentStyle: { backgroundColor: WHITE },
       })}
     >
@@ -170,17 +154,15 @@ function CommunityStackNavigator() {
       <CommunityStack.Screen
         name="PostDetail"
         component={PostDetailScreen}
-        options={{ headerTitle: "" }}
       />
       <CommunityStack.Screen
         name="ChallengeDetail"
         component={ChallengeDetailScreen}
-        options={{ headerTitle: "인증 게시글" }}
       />
       <CommunityStack.Screen
         name="AddPost"
         component={AddPostScreen}
-        options={({ route }: any) => ({ headerTitle: route.params?.postId ? "게시글 수정" : "작품 등록" })}
+        options={{ headerShown: false }}
       />
     </CommunityStack.Navigator>
   );
@@ -213,21 +195,26 @@ function FloatingTabBackground() {
 }
 
 function MainTabs() {
-  const insets = useSafeAreaInsets();
-
   return (
     <Tab.Navigator
       detachInactiveScreens={false}
-      screenOptions={{
+      screenOptions={({ route }) => {
+        const nestedRoute = getFocusedRouteNameFromRoute(route);
+        const hideTabBar =
+          (route.name === "Home" && nestedRoute === "TutorialVideo") ||
+          (route.name === "Community" && !!nestedRoute && nestedRoute !== "CommunityFeed");
+
+        return {
         lazy: false,
         sceneStyle: { backgroundColor: WHITE },
         tabBarActiveTintColor: PRIMARY,
         tabBarInactiveTintColor: INK3,
-        tabBarStyle: {
+        tabBarStyle: hideTabBar ? { display: "none" } : {
           position: "absolute",
-          left: "5%",
-          width: "90%",
-          bottom: Math.max(insets.bottom + 12, 38),
+          start: 20,
+          end: 20,
+          width: undefined,
+          bottom: 20,
           height: 78,
           paddingHorizontal: 5,
           paddingTop: 7,
@@ -250,14 +237,18 @@ function MainTabs() {
           overflow: "hidden",
         },
         tabBarActiveBackgroundColor: "rgba(255,255,255,0.8)",
+        tabBarIconStyle: {
+          marginTop: 6,
+        },
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: "700",
           lineHeight: 14,
-          marginBottom: 2,
+          marginBottom: 0,
         },
         tabBarHideOnKeyboard: true,
         headerShown: false,
+        };
       }}
     >
       <Tab.Screen

@@ -10,22 +10,29 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Modal,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
-import { useHeaderHeight } from '@react-navigation/elements';
 import { useAddPost, usePost, useUpdatePost } from '../hooks/usePosts';
 import type { CommunityStackParamList } from '../types/navigation';
 import { categoriesApi } from '../services/api';
-import { RichEditor, RichToolbar, actions } from 'react-native-pell-rich-editor';
+import { RichEditor } from 'react-native-pell-rich-editor';
 import { pickAndUploadImage } from '../services/imageUpload';
+import type { ImageSource } from '../services/imageUpload';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 const TITLE_MAX = 200;
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+}
+
+function removeImages(html: string): string {
+  return html.replace(/<img[^>]*>/gi, '');
 }
 
 export default function AddPostScreen() {
@@ -35,8 +42,10 @@ export default function AddPostScreen() {
   const [body, setBody] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [mediaIds, setMediaIds] = useState<string[]>([]);
+  const [mediaPreviews, setMediaPreviews] = useState<{ id: string; url: string }[]>([]);
   const [mediaChanged, setMediaChanged] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [categoryModalVisible, setCategoryModalVisible] = useState(false);
 
   const richEditorRef = useRef<RichEditor>(null);
   const initializedPostId = useRef<string | undefined>(undefined);
@@ -44,44 +53,24 @@ export default function AddPostScreen() {
   const updatePostMutation = useUpdatePost();
   const { data: editingPost, isLoading: postLoading } = usePost(postId ?? '');
   const navigation = useNavigation();
-  const headerHeight = useHeaderHeight();
+
+  const uploadImage = async (source: ImageSource) => {
+    setUploading(true);
+    const result = await pickAndUploadImage(source);
+    setUploading(false);
+    if (!result.ok) {
+      if (result.error !== 'cancelled') Alert.alert('사진 업로드 실패', result.error);
+      return;
+    }
+    setMediaIds((ids) => [...ids, result.mediaId]);
+    setMediaPreviews((previews) => [...previews, { id: result.mediaId, url: result.url }]);
+    setMediaChanged(true);
+  };
 
   const handleInsertImage = () => {
     Alert.alert('사진 추가', '사진을 선택할 방법을 선택하세요.', [
-      {
-        text: '카메라',
-        onPress: async () => {
-          setUploading(true);
-          const result = await pickAndUploadImage('camera');
-          setUploading(false);
-          if (!result.ok) {
-            if ('error' in result && result.error !== 'cancelled') {
-              Alert.alert('사진 업로드 실패', result.error);
-            }
-            return;
-          }
-          setMediaIds((ids) => [...ids, result.mediaId]);
-          setMediaChanged(true);
-          richEditorRef.current?.insertImage(result.url, 'style="max-width:100%;border-radius:8px;"');
-        },
-      },
-      {
-        text: '갤러리',
-        onPress: async () => {
-          setUploading(true);
-          const result = await pickAndUploadImage('gallery');
-          setUploading(false);
-          if (!result.ok) {
-            if ('error' in result && result.error !== 'cancelled') {
-              Alert.alert('사진 업로드 실패', result.error);
-            }
-            return;
-          }
-          setMediaIds((ids) => [...ids, result.mediaId]);
-          setMediaChanged(true);
-          richEditorRef.current?.insertImage(result.url, 'style="max-width:100%;border-radius:8px;"');
-        },
-      },
+      { text: '카메라', onPress: () => void uploadImage('camera') },
+      { text: '갤러리', onPress: () => void uploadImage('gallery') },
       { text: '취소', style: 'cancel' },
     ]);
   };
@@ -91,17 +80,21 @@ export default function AddPostScreen() {
     queryFn: categoriesApi.getCategories,
   });
 
-  useEffect(() => {
-    if (!categoryId && categories.length > 0) setCategoryId(categories[0].id);
-  }, [categories, categoryId]);
+  const selectedCategory = categories.find((category) => category.id === categoryId);
+  const handleSelectCategory = () => {
+    if (categoriesLoading || categories.length === 0) return;
+    setCategoryModalVisible(true);
+  };
 
   useEffect(() => {
     if (!postId || !editingPost || initializedPostId.current === postId) return;
     initializedPostId.current = postId;
     setTitle(editingPost.title);
-    setBody(editingPost.body);
+    setBody(removeImages(editingPost.body));
     setCategoryId(editingPost.category?.id ?? '');
-    setMediaIds(editingPost.media?.filter((item) => item.id !== item.url).map((item) => item.id) ?? []);
+    const editableMedia = editingPost.media?.filter((item) => item.id !== item.url) ?? [];
+    setMediaIds(editableMedia.map((item) => item.id));
+    setMediaPreviews(editableMedia.map((item) => ({ id: item.id, url: item.url })));
   }, [editingPost, postId]);
 
   const bodyText = stripHtml(body);
@@ -140,142 +133,168 @@ export default function AddPostScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={headerHeight}
       >
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel="작성 취소"
+          >
+            <Ionicons name="close" size={28} color={INK1} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.completeButton}
+            onPress={handleSubmit}
+            disabled={!isValid || isPending}
+            accessibilityRole="button"
+            accessibilityLabel={postId ? '수정 완료' : '등록 완료'}
+          >
+            {isPending ? (
+              <ActivityIndicator size="small" color={PRIMARY} />
+            ) : (
+              <Text style={[styles.completeText, !isValid && styles.completeTextDisabled]}>완료</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
           nestedScrollEnabled
+          showsVerticalScrollIndicator={false}
         >
-          {/* 카테고리 */}
-          <Text style={styles.label}>카테고리 <Text style={styles.required}>*</Text></Text>
-          {categoriesLoading ? (
-            <ActivityIndicator color={PRIMARY} style={{ marginBottom: 16 }} />
-          ) : categoriesError ? (
-            <Text style={styles.catError}>카테고리 로드 실패: {String(categoriesError)}</Text>
-          ) : categories.length === 0 ? (
-            <Text style={styles.catError}>등록된 카테고리가 없어요 (서버에 카테고리를 추가해주세요)</Text>
-          ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.catScroll}
-              contentContainerStyle={styles.catRow}
-            >
-              {categories.map((cat) => (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[styles.catChip, categoryId === cat.id && styles.catChipActive]}
-                  onPress={() => setCategoryId(cat.id)}
-                  activeOpacity={0.75}
-                >
-                  <Text style={[styles.catChipText, categoryId === cat.id && styles.catChipTextActive]}>
-                    {cat.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
+          <TouchableOpacity style={styles.topicSelector} onPress={handleSelectCategory} activeOpacity={0.7}>
+            {categoriesLoading ? (
+              <ActivityIndicator size="small" color={PRIMARY} />
+            ) : (
+              <Text style={[styles.topicText, !selectedCategory && styles.topicPlaceholder]}>
+                {selectedCategory?.label ?? '주제를 선택해주세요.'}
+              </Text>
+            )}
+            <Ionicons name="chevron-down" size={22} color={INK2} />
+          </TouchableOpacity>
+          {categoriesError ? <Text style={styles.catError}>주제를 불러오지 못했어요.</Text> : null}
+          <View style={styles.divider} />
 
-          {/* 제목 */}
-          <View style={styles.fieldHeader}>
-            <Text style={styles.label}>제목 <Text style={styles.required}>*</Text></Text>
-            <Text style={[styles.count, title.length > TITLE_MAX * 0.9 && styles.countWarn]}>
-              {title.length} / {TITLE_MAX}
-            </Text>
-          </View>
           <TextInput
             style={styles.titleInput}
             value={title}
             onChangeText={(t) => setTitle(t.slice(0, TITLE_MAX))}
-            placeholder="제목을 입력하세요"
+            placeholder="제목을 입력해주세요"
             placeholderTextColor={INK3}
             returnKeyType="next"
           />
 
-          {/* 내용 */}
-          <Text style={[styles.label, { marginBottom: 0 }]}>내용 <Text style={styles.required}>*</Text></Text>
-
-          {/* 툴바 */}
-          <View style={styles.toolbarRow}>
-            <RichToolbar
-              editor={richEditorRef}
-              style={styles.toolbar}
-              selectedIconTint={PRIMARY}
-              iconTint={INK2}
-              actions={[
-                actions.setBold,
-                actions.setItalic,
-                actions.setUnderline,
-                actions.setStrikethrough,
-                actions.insertOrderedList,
-                actions.insertBulletsList,
-                actions.indent,
-                actions.outdent,
-                actions.undo,
-                actions.redo,
-              ]}
-            />
-            <TouchableOpacity
-              style={[styles.imgBtn, uploading && styles.imgBtnDisabled]}
-              onPress={handleInsertImage}
-              disabled={uploading}
-              activeOpacity={0.75}
-            >
-              {uploading
-                ? <ActivityIndicator size="small" color={PRIMARY} />
-                : <Text style={styles.imgBtnIcon}>🖼</Text>
-              }
-            </TouchableOpacity>
-          </View>
-
-          {/* 에디터 */}
           <View style={styles.editorWrap}>
             <RichEditor
               ref={richEditorRef}
-              initialContentHTML={editingPost?.body}
+              initialContentHTML={editingPost ? removeImages(editingPost.body) : undefined}
               style={styles.editor}
               initialHeight={220}
-              placeholder="내용을 입력하세요"
+              placeholder="뜨개 이야기를 자유롭게 나눠보세요."
               onChange={setBody}
               editorStyle={{
-                backgroundColor: '#fff',
+                backgroundColor: '#FFFFFF',
                 color: INK1,
                 placeholderColor: INK3,
-                contentCSSText: 'font-family: -apple-system, sans-serif; font-size: 14px; line-height: 1.6; padding: 4px 0;',
+                contentCSSText: 'font-family: -apple-system, sans-serif; font-size: 16px; line-height: 1.65; padding: 8px 0;',
+                cssText: 'body { margin: 0; padding: 0; }',
               }}
               useContainer={false}
             />
           </View>
+
+          <View style={styles.photoSection}>
+            <View style={styles.photoSectionHeader}>
+              <Text style={styles.photoSectionTitle}>사진</Text>
+              {mediaPreviews.length > 0 ? <Text style={styles.photoCount}>{mediaPreviews.length}장</Text> : null}
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoRow}>
+              <TouchableOpacity
+                style={styles.photoAddButton}
+                onPress={handleInsertImage}
+                disabled={uploading}
+                activeOpacity={0.75}
+                accessibilityLabel="사진 추가"
+              >
+                {uploading ? (
+                  <ActivityIndicator size="small" color={PRIMARY} />
+                ) : (
+                  <>
+                    <Ionicons name="camera-outline" size={24} color={INK2} />
+                    <Text style={styles.photoAddText}>사진 추가</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              {mediaPreviews.map((media) => (
+                <View key={media.id} style={styles.photoPreviewWrap}>
+                  <Image source={{ uri: media.url }} style={styles.photoPreview} resizeMode="cover" />
+                  <TouchableOpacity
+                    style={styles.photoRemoveButton}
+                    onPress={() => {
+                      setMediaIds((ids) => ids.filter((id) => id !== media.id));
+                      setMediaPreviews((previews) => previews.filter((item) => item.id !== media.id));
+                      setMediaChanged(true);
+                    }}
+                    accessibilityLabel="첨부 사진 삭제"
+                  >
+                    <Ionicons name="close" size={16} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
         </ScrollView>
 
-        {/* 등록 버튼 */}
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.submitBtn, (!isValid || isPending) && styles.submitBtnDisabled]}
-            onPress={handleSubmit}
-            disabled={!isValid || isPending}
-            activeOpacity={0.85}
-          >
-            {isPending ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.submitBtnText}>{postId ? '수정하기' : '등록하기'}</Text>
-            )}
-          </TouchableOpacity>
-        </View>
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={categoryModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setCategoryModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.topicBackdrop}
+          activeOpacity={1}
+          onPress={() => setCategoryModalVisible(false)}
+        >
+          <TouchableOpacity style={styles.topicSheet} activeOpacity={1}>
+            <View style={styles.topicHandle} />
+            <Text style={styles.topicSheetTitle}>어떤 이야기인가요?</Text>
+            {categories.map((category) => {
+              const selected = category.id === categoryId;
+              return (
+                <TouchableOpacity
+                  key={category.id}
+                  style={styles.topicOption}
+                  onPress={() => {
+                    setCategoryId(category.id);
+                    setCategoryModalVisible(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.topicOptionText, selected && styles.topicOptionTextSelected]}>
+                    {category.label}
+                  </Text>
+                  {selected ? <Ionicons name="checkmark" size={22} color={PRIMARY} /> : null}
+                </TouchableOpacity>
+              );
+            })}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const PRIMARY = '#FF7325';
-const PRIMARY_DEEP = '#C7521A';
 const INK1 = '#1A1A1A';
 const INK2 = '#404040';
 const INK3 = '#8A8A8A';
@@ -285,98 +304,85 @@ const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
   flex: { flex: 1 },
-  scroll: { flex: 1 },
-  content: { padding: 20, paddingBottom: 96 },
-  label: { fontSize: 13, fontWeight: '700', color: INK1, marginBottom: 8 },
-  required: { color: PRIMARY },
-  fieldHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 },
-  count: { fontSize: 11, color: INK3, fontWeight: '600' },
-  countWarn: { color: '#E55B4B' },
-  catError: { fontSize: 12, color: '#E55B4B', marginBottom: 16, fontWeight: '600' },
-  catScroll: { marginBottom: 20, flexShrink: 0 },
-  catRow: { gap: 8, paddingRight: 4 },
-  catChip: {
-    height: 34,
+  header: {
+    height: 60,
     paddingHorizontal: 14,
-    borderRadius: 999,
-    backgroundColor: '#F2F2F2',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: LINE,
-  },
-  catChipActive: { backgroundColor: INK1, borderColor: INK1 },
-  catChipText: { fontSize: 13, fontWeight: '600', color: INK1 },
-  catChipTextActive: { color: '#fff', fontWeight: '800' },
-  titleInput: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: LINE,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 15,
-    fontWeight: '700',
-    color: INK1,
-    marginBottom: 20,
-  },
-  toolbarRow: {
     flexDirection: 'row',
-    alignItems: 'stretch',
-    marginTop: 10,
-  },
-  toolbar: {
-    flex: 1,
-    backgroundColor: '#F8F8F8',
-    borderTopLeftRadius: 10,
-    borderWidth: 1.5,
-    borderRightWidth: 0,
-    borderBottomWidth: 1,
-    borderColor: LINE,
-    height: 44,
-  },
-  imgBtn: {
-    width: 44,
-    height: 44,
-    backgroundColor: '#F8F8F8',
-    borderTopRightRadius: 10,
-    borderWidth: 1.5,
-    borderBottomWidth: 1,
-    borderColor: LINE,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
   },
-  imgBtnDisabled: { opacity: 0.5 },
-  imgBtnIcon: { fontSize: 20 },
+  headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  completeButton: { minWidth: 58, height: 44, alignItems: 'center', justifyContent: 'center' },
+  completeText: { fontSize: 17, fontWeight: '800', color: PRIMARY },
+  completeTextDisabled: { color: '#B8BEC5' },
+  scroll: { flex: 1 },
+  content: { paddingHorizontal: 20 },
+  topicSelector: {
+    minHeight: 62,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  topicText: { flex: 1, fontSize: 17, fontWeight: '700', color: INK1 },
+  topicPlaceholder: { color: INK3 },
+  divider: { height: 1, backgroundColor: LINE },
+  catError: { fontSize: 12, color: '#E55B4B', marginTop: 8, fontWeight: '600' },
+  titleInput: {
+    minHeight: 82,
+    paddingHorizontal: 0,
+    paddingVertical: 18,
+    fontSize: 25,
+    lineHeight: 32,
+    fontWeight: '800',
+    color: INK1,
+  },
   editorWrap: {
-    borderLeftWidth: 1.5,
-    borderRightWidth: 1.5,
-    borderBottomWidth: 1.5,
-    borderColor: LINE,
-    borderBottomLeftRadius: 14,
-    borderBottomRightRadius: 14,
-    overflow: 'hidden',
-    marginBottom: 16,
-    minHeight: 220,
-    backgroundColor: '#fff',
+    minHeight: 320,
+    backgroundColor: '#FFFFFF',
   },
   editor: {
     flex: 1,
-    paddingHorizontal: 4,
+    minHeight: 320,
   },
-  footer: { padding: 16, paddingBottom: Platform.OS === 'ios' ? 8 : 16 },
-  submitBtn: {
-    height: 52,
-    borderRadius: 14,
-    backgroundColor: PRIMARY,
+  photoSection: { paddingTop: 20, borderTopWidth: 1, borderTopColor: LINE },
+  photoSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  photoSectionTitle: { fontSize: 16, fontWeight: '800', color: INK1 },
+  photoCount: { fontSize: 12, fontWeight: '700', color: INK3 },
+  photoRow: { gap: 10, paddingRight: 4 },
+  photoPreviewWrap: { width: 108, height: 108, borderRadius: 16, overflow: 'hidden' },
+  photoPreview: { width: '100%', height: '100%' },
+  photoRemoveButton: {
+    position: 'absolute', top: 7, right: 7, width: 26, height: 26, borderRadius: 13,
+    backgroundColor: 'rgba(0,0,0,0.58)', alignItems: 'center', justifyContent: 'center',
+  },
+  photoAddButton: {
+    width: 108, height: 108, borderRadius: 16,
+    backgroundColor: '#F2F4F6', alignItems: 'center', justifyContent: 'center', gap: 7,
+  },
+  photoAddText: { fontSize: 12, fontWeight: '700', color: INK2 },
+  topicBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(20,22,26,0.36)',
+  },
+  topicSheet: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 34,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    backgroundColor: '#FFFFFF',
+  },
+  topicHandle: { alignSelf: 'center', width: 38, height: 5, borderRadius: 999, backgroundColor: '#D9DDE1' },
+  topicSheetTitle: { marginTop: 22, marginBottom: 12, fontSize: 21, fontWeight: '800', color: INK1 },
+  topicOption: {
+    minHeight: 56,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: PRIMARY_DEEP,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F2F4F6',
   },
-  submitBtnDisabled: { backgroundColor: '#D0D0D0', shadowColor: 'transparent', elevation: 0 },
-  submitBtnText: { fontSize: 16, fontWeight: '800', color: '#fff' },
+  topicOptionText: { fontSize: 16, fontWeight: '700', color: INK2 },
+  topicOptionTextSelected: { color: PRIMARY, fontWeight: '800' },
 });

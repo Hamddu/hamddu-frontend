@@ -262,14 +262,6 @@ export default function CommunityScreen() {
             />
           )}
 
-          {/* FAB */}
-          <TouchableOpacity
-            style={styles.fab}
-            onPress={() => navigation.navigate("AddPost")}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.fabText}>글쓰기</Text>
-          </TouchableOpacity>
         </View>
       ) : challengesLoading ? (
         <View style={styles.center}>
@@ -319,6 +311,17 @@ export default function CommunityScreen() {
             />
           )}
         />
+      )}
+
+      {tab === "post" && (
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={() => navigation.navigate("AddPost")}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="add" size={20} color="#fff" />
+          <Text style={styles.fabText}>글쓰기</Text>
+        </TouchableOpacity>
       )}
     </SafeAreaView>
   );
@@ -468,19 +471,16 @@ const styles = StyleSheet.create({
   fab: {
     position: "absolute",
     right: 18,
-    bottom: 102,
-    minWidth: 88,
+    bottom: 114,
+    minWidth: 100,
     height: 50,
     borderRadius: 25,
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
     backgroundColor: PRIMARY,
+    flexDirection: "row",
+    gap: 5,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    elevation: 6,
   },
   fabText: { color: "#fff", fontSize: 15, fontWeight: "800" },
   certContent: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 130 },

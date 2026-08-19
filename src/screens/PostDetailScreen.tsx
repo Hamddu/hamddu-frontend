@@ -31,6 +31,7 @@ import CommentItem from "../components/CommentItem";
 import { getMyProfile } from "../api/users.api";
 import { commentsApi, countComments, postsApi, ReportReason } from "../services/api";
 import { getAvatarColors } from "../utils/avatarColors";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const PRIMARY = "#FF7325";
 const PRIMARY_SOFT = "#FFE6D6";
@@ -80,6 +81,7 @@ export default function PostDetailScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<CommunityStackParamList>>();
   const { postId } = route.params;
   const headerHeight = useHeaderHeight();
+  const insets = useSafeAreaInsets();
 
   const { data: post, isLoading: postLoading, isError: postError, isRefetching: postRefreshing, refetch: refetchPost } = usePost(postId);
   const {
@@ -425,7 +427,7 @@ export default function PostDetailScreen() {
       </ScrollView>
 
       {/* 댓글 입력창 */}
-      <View style={styles.commentInputContainer}>
+      <View style={[styles.commentInputContainer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
         {replyTo && (
           <View style={styles.replyTargetRow}>
             <Text style={styles.replyTargetText}>@{replyTo.nickname}님에게 답글</Text>

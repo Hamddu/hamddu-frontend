@@ -153,29 +153,6 @@ function CounterDetail({
         >
           <Ionicons name="chevron-back" size={24} color={INK1} />
         </TouchableOpacity>
-        {editingName ? (
-          <TextInput
-            style={styles.detailTitleInput}
-            value={projectName}
-            onChangeText={setProjectName}
-            onBlur={() => setEditingName(false)}
-            onSubmitEditing={() => setEditingName(false)}
-            autoFocus
-            selectTextOnFocus
-            returnKeyType="done"
-          />
-        ) : (
-          <TouchableOpacity
-            onPress={() => setEditingName(true)}
-            activeOpacity={0.7}
-            style={styles.detailTitleBtn}
-            accessibilityRole="button"
-            accessibilityLabel="프로젝트 이름 수정"
-          >
-            <Text style={styles.detailTitle}>{projectName}</Text>
-          </TouchableOpacity>
-        )}
-        <View style={{ width: 56 }} />
       </View>
 
       <FlatList
@@ -186,6 +163,29 @@ function CounterDetail({
         ListHeaderComponent={
           <>
             <View style={styles.counterHero}>
+              {editingName ? (
+                <TextInput
+                  style={styles.detailTitleInput}
+                  value={projectName}
+                  onChangeText={setProjectName}
+                  onBlur={() => setEditingName(false)}
+                  onSubmitEditing={() => setEditingName(false)}
+                  autoFocus
+                  selectTextOnFocus
+                  returnKeyType="done"
+                />
+              ) : (
+                <TouchableOpacity
+                  onPress={() => setEditingName(true)}
+                  activeOpacity={0.7}
+                  style={styles.detailTitleBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel="프로젝트 이름 수정"
+                >
+                  <Text style={styles.detailTitle}>{projectName}</Text>
+                  <Ionicons name="pencil-outline" size={15} color={INK3} />
+                </TouchableOpacity>
+              )}
               <View style={styles.drumWrapper}>
                 <View style={[styles.drum, { width: drumWidth }]}>
                   <CounterHandle rotation={handleRotation} />
@@ -377,7 +377,7 @@ export default function CounterScreen() {
       <FlatList
         data={projects}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, projects.length === 0 && styles.emptyListContent]}
         alwaysBounceVertical
         refreshControl={
           <RefreshControl
@@ -389,9 +389,15 @@ export default function CounterScreen() {
         }
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
-            <Text style={styles.emptyIcon}>🧶</Text>
-            <Text style={styles.emptyText}>아직 프로젝트가 없어요</Text>
-            <Text style={styles.emptySubText}>+ 버튼을 눌러 첫 프로젝트를 시작해봐요</Text>
+            <View style={styles.emptyIconWrap}>
+              <Ionicons name="albums-outline" size={34} color={PRIMARY} />
+            </View>
+            <Text style={styles.emptyText}>아직 코카운터가 비어 있어요</Text>
+            <Text style={styles.emptySubText}>새 프로젝트를 만들고{`\n`}한 코씩 차곡차곡 기록해보세요</Text>
+            <TouchableOpacity style={styles.emptyCta} onPress={handleNewProject} activeOpacity={0.85}>
+              <Ionicons name="add" size={20} color="#FFFFFF" />
+              <Text style={styles.emptyCtaText}>새 프로젝트 시작하기</Text>
+            </TouchableOpacity>
           </View>
         }
         renderItem={({ item }) => (
@@ -436,9 +442,11 @@ export default function CounterScreen() {
         }
       />
 
-      <TouchableOpacity style={styles.addBtn} onPress={handleNewProject} activeOpacity={0.85}>
-        <Text style={styles.addBtnText}>+</Text>
-      </TouchableOpacity>
+      {projects.length > 0 && (
+        <TouchableOpacity style={styles.addBtn} onPress={handleNewProject} activeOpacity={0.85}>
+          <Ionicons name="add" size={24} color="#fff" />
+        </TouchableOpacity>
+      )}
 
       <Modal visible={newModal} transparent animationType="slide">
         <KeyboardAvoidingView
@@ -516,18 +524,24 @@ const styles = StyleSheet.create({
 
   // 리스트
   addBtn: {
-    position: "absolute", right: 20, bottom: 102,
-    width: 40, height: 40, borderRadius: 12,
+    position: "absolute", right: 18, bottom: 114,
+    width: 50, height: 50, borderRadius: 25,
     backgroundColor: PRIMARY, alignItems: "center", justifyContent: "center",
-    shadowColor: PRIMARY_DEEP, shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 1, shadowRadius: 0, elevation: 3,
   },
-  addBtnText: { color: "#fff", fontSize: 22, fontWeight: "800", lineHeight: 24 },
   listContent: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 130 },
-  emptyWrap: { alignItems: "center", paddingTop: 80 },
-  emptyIcon: { fontSize: 48, marginBottom: 16 },
-  emptyText: { fontSize: 16, fontWeight: "800", color: INK1, marginBottom: 6 },
-  emptySubText: { fontSize: 13, color: INK3 },
+  emptyListContent: { flexGrow: 1, justifyContent: "center", paddingBottom: 110 },
+  emptyWrap: { alignItems: "center" },
+  emptyIconWrap: {
+    width: 76, height: 76, borderRadius: 26, marginBottom: 24,
+    backgroundColor: "#FFF0E8", alignItems: "center", justifyContent: "center",
+  },
+  emptyText: { fontSize: 20, fontWeight: "800", color: INK1, marginBottom: 10, letterSpacing: -0.4 },
+  emptySubText: { fontSize: 14, lineHeight: 21, color: INK3, fontWeight: "600", textAlign: "center" },
+  emptyCta: {
+    height: 52, borderRadius: 16, marginTop: 28, paddingHorizontal: 24,
+    backgroundColor: PRIMARY, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+  },
+  emptyCtaText: { color: "#FFFFFF", fontSize: 15, fontWeight: "800" },
   projectCard: {
     flexDirection: "row", alignItems: "center", gap: 14,
     backgroundColor: "#fff", borderRadius: 16, padding: 14,
@@ -563,9 +577,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF8F2",
   },
   backBtn: { width: 56, height: 44, alignItems: "flex-start", justifyContent: "center" },
-  detailTitleBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 },
+  detailTitleBtn: { alignSelf: "center", minHeight: 42, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, marginBottom: 18, paddingHorizontal: 20 },
   detailTitle: { fontSize: 19, fontWeight: "800", color: INK1 },
-  detailTitleInput: { flex: 1, fontSize: 19, fontWeight: "800", color: INK1, textAlign: "center", borderBottomWidth: 1.5, borderBottomColor: PRIMARY, paddingVertical: 2 },
+  detailTitleInput: { height: 42, marginHorizontal: 26, marginBottom: 18, fontSize: 19, fontWeight: "800", color: INK1, textAlign: "center", borderBottomWidth: 1.5, borderBottomColor: PRIMARY, paddingVertical: 2 },
   detailList: { flex: 1, backgroundColor: "#FFFFFF" },
   detailContent: { paddingBottom: 130 },
   counterHero: { paddingTop: 31, paddingBottom: 38, backgroundColor: "#FFF8F2" },

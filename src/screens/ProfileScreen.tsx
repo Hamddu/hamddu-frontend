@@ -45,6 +45,8 @@ function normalizeImageUrl(url?: string | null): string | null {
   return `${API_BASE_URL}${url.startsWith("/") ? "" : "/"}${url}`;
 }
 
+const isValidNickname = (value: string) => /^[가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9\s]{2,30}$/.test(value.trim());
+
 function CertCard({ item, wide = false }: { item: Challenge; wide?: boolean }) {
   const [imageFailed, setImageFailed] = useState(false);
   const imageUrl = normalizeImageUrl(item.imageUrl);
@@ -145,7 +147,11 @@ export default function ProfileScreen() {
   const handleSaveNickname = async () => {
     const value = nickname.trim();
     const nicknameChanged = value !== profile?.nickname;
-    if (value.length < 2 || (!nicknameChanged && !profileImageChanged) || isSavingNickname) return;
+    if (!isValidNickname(value)) {
+      Alert.alert("닉네임을 확인해주세요", "2~30자의 한글, 영문, 숫자, 공백만 사용할 수 있어요.");
+      return;
+    }
+    if ((!nicknameChanged && !profileImageChanged) || isSavingNickname) return;
 
     setIsSavingNickname(true);
     try {
@@ -280,65 +286,90 @@ export default function ProfileScreen() {
         }
       >
         <View style={styles.userCard}>
-          <View style={[styles.avatarWrap, { backgroundColor: avatarColors.backgroundColor }]}>
-            {displayProfileImageUrl ? (
-              <Image source={{ uri: displayProfileImageUrl }} style={styles.profileImage} resizeMode="cover" />
-            ) : (
-              <Text style={[styles.avatarText, { color: avatarColors.color }]}>{avatarText}</Text>
-            )}
-          </View>
-          <View style={styles.userInfo}>
-            <View style={styles.userNameRow}>
-              <Text style={styles.username} numberOfLines={1}>
-                {displayName}
-              </Text>
-              <TouchableOpacity
-                style={styles.editNicknameBtn}
-                onPress={openNicknameModal}
-                accessibilityRole="button"
-                accessibilityLabel="닉네임 수정"
-              >
-                <Ionicons name="create-outline" size={17} color={INK3} />
-              </TouchableOpacity>
-              {xpWallet ? (
-                <View style={styles.levelBadge}>
-                  <Text style={styles.levelText}>Lv.{xpWallet.currentLevel}</Text>
-                </View>
-              ) : null}
+          <View style={styles.profileTop}>
+            <View style={[styles.avatarWrap, { backgroundColor: avatarColors.backgroundColor }]}>
+              {displayProfileImageUrl ? (
+                <Image source={{ uri: displayProfileImageUrl }} style={styles.profileImage} resizeMode="cover" />
+              ) : (
+                <Text style={[styles.avatarText, { color: avatarColors.color }]}>{avatarText}</Text>
+              )}
             </View>
-            {xpWallet ? (
-              <View style={styles.xpRow}>
-                <View style={styles.xpLabels}>
-                  <Text style={styles.xpLabel}>
-                    XP {xpWallet.totalXp} / {xpWallet.nextLevelThreshold ?? "-"}
-                  </Text>
-                  {typeof xpWallet.nextLevelThreshold === "number" ? (
-                    <Text style={styles.xpNext}>
-                      다음 레벨까지 {Math.max(xpWallet.nextLevelThreshold - xpWallet.totalXp, 0)}
-                    </Text>
-                  ) : null}
-                </View>
-                <View style={styles.xpBar}>
-                  <View style={[styles.xpFill, { width: `${xpPct}%` as any }]} />
-                </View>
+            <View style={styles.userInfo}>
+              <View style={styles.userNameRow}>
+                <Text style={styles.username} numberOfLines={1}>{displayName}</Text>
+                {xpWallet ? (
+                  <View style={styles.levelBadge}>
+                    <Text style={styles.levelText}>Lv.{xpWallet.currentLevel}</Text>
+                  </View>
+                ) : null}
               </View>
-            ) : null}
+              <Text style={styles.profileSub} numberOfLines={1}>
+                {profile?.email ?? "함뜨와 함께 뜨는 중"}
+              </Text>
+            </View>
           </View>
+
+          <View style={styles.profileFacts}>
+            <View style={styles.profileFactRow}>
+              <Ionicons name="calendar-outline" size={20} color={INK2} />
+              <Text style={styles.profileFactText}>
+                {profile?.createdAt
+                  ? `${new Date(profile.createdAt).toLocaleDateString("ko-KR")} 가입`
+                  : "가입일 정보 없음"}
+              </Text>
+            </View>
+            <View style={styles.profileFactRow}>
+              <Ionicons name="sparkles-outline" size={20} color={INK2} />
+              <Text style={styles.profileFactText}>
+                {xpWallet ? `뜨개 레벨 ${xpWallet.currentLevel} · XP ${xpWallet.totalXp}` : "뜨개 기록을 모으는 중"}
+              </Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.profileEditButton}
+            onPress={openNicknameModal}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="프로필 수정"
+          >
+            <Text style={styles.profileEditButtonText}>프로필 수정</Text>
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.statsCard}>
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>보유 포인트</Text>
-            <Text style={styles.statValue}>
-              {pointsWallet ? pointsWallet.balance.toLocaleString() : "-"}
-            </Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>완료한 인증</Text>
-            <Text style={[styles.statValue, styles.statValueOrange]}>
-              {myChallenges.length}
-            </Text>
+        <View style={styles.recordCard}>
+          <Text style={styles.recordTitle}>나의 뜨개 기록</Text>
+          {xpWallet ? (
+            <View style={styles.xpRow}>
+              <View style={styles.xpLabels}>
+                <Text style={styles.xpLabel}>레벨 {xpWallet.currentLevel}</Text>
+                <Text style={styles.xpNext}>
+                  XP {xpWallet.totalXp} / {xpWallet.nextLevelThreshold ?? "-"}
+                </Text>
+              </View>
+              <View style={styles.xpBar}>
+                <View style={[styles.xpFill, { width: `${xpPct}%` as any }]} />
+              </View>
+              {typeof xpWallet.nextLevelThreshold === "number" ? (
+                <Text style={styles.xpGuide}>
+                  다음 레벨까지 {Math.max(xpWallet.nextLevelThreshold - xpWallet.totalXp, 0)} XP 남았어요
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+
+          <View style={styles.statsCard}>
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>보유 포인트</Text>
+              <Text style={styles.statValue}>
+                {pointsWallet ? pointsWallet.balance.toLocaleString() : "-"}
+              </Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>완료한 인증</Text>
+              <Text style={[styles.statValue, styles.statValueOrange]}>{myChallenges.length}</Text>
+            </View>
           </View>
         </View>
 
@@ -460,8 +491,8 @@ export default function ProfileScreen() {
         <SafeAreaView style={styles.feedbackSafeArea}>
           <View style={styles.feedbackHeader}>
             <View>
-              <Text style={styles.feedbackEyebrow}>HAMDDU FEEDBACK</Text>
               <Text style={styles.feedbackTitle}>어떤 점을 바꿔볼까요?</Text>
+              <Text style={styles.feedbackDescription}>함뜨가 더 좋아질 수 있도록 편하게 들려주세요.</Text>
             </View>
             <TouchableOpacity
               style={styles.feedbackCloseBtn}
@@ -474,23 +505,12 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
           <View style={styles.feedbackForm}>
-            <View style={styles.feedbackIntro}>
-              <View style={styles.feedbackIntroIcon}>
-                <Text style={styles.feedbackIntroIconText}>✦</Text>
-              </View>
-              <View style={styles.feedbackIntroCopy}>
-                <Text style={styles.feedbackIntroTitle}>작은 의견도 좋아요</Text>
-                <Text style={styles.feedbackIntroText}>
-                  불편했던 점이나 새로 있었으면 하는 기능을 자유롭게 적어주세요.
-                </Text>
-              </View>
-            </View>
             <View style={styles.feedbackInputCard}>
               <TextInput
                 style={styles.feedbackInput}
                 value={feedback}
                 onChangeText={setFeedback}
-                placeholder="예) 튜토리얼 자막이 있으면 좋겠어요"
+                placeholder="불편했던 점이나 있었으면 하는 기능을 적어주세요"
                 placeholderTextColor="#AAA29C"
                 multiline
                 maxLength={2000}
@@ -511,10 +531,7 @@ export default function ProfileScreen() {
               {isSendingFeedback ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <View style={styles.feedbackSubmitContent}>
-                  <Text style={styles.feedbackSubmitText}>의견 보내기</Text>
-                  <Ionicons name="arrow-forward" size={18} color="#fff" />
-                </View>
+                <Text style={styles.feedbackSubmitText}>의견 보내기</Text>
               )}
             </TouchableOpacity>
             <Text style={styles.feedbackPrivacy}>보내주신 의견은 서비스 개선에만 사용돼요.</Text>
@@ -556,7 +573,7 @@ export default function ProfileScreen() {
             <TextInput
               style={styles.nicknameInput}
               value={nickname}
-              onChangeText={(text) => setNickname(text.replace(/[^가-힣a-zA-Z0-9\s]/g, ""))}
+              onChangeText={setNickname}
               placeholder="닉네임을 입력해주세요"
               placeholderTextColor={INK3}
               maxLength={30}
@@ -576,11 +593,11 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={[
                   styles.dialogSaveBtn,
-                  (nickname.trim().length < 2 || !hasProfileChanges || isSavingNickname || isUploadingProfileImage) &&
+                  (!isValidNickname(nickname) || !hasProfileChanges || isSavingNickname || isUploadingProfileImage) &&
                     styles.feedbackSubmitBtnDisabled,
                 ]}
                 onPress={handleSaveNickname}
-                disabled={nickname.trim().length < 2 || !hasProfileChanges || isSavingNickname || isUploadingProfileImage}
+                disabled={!isValidNickname(nickname) || !hasProfileChanges || isSavingNickname || isUploadingProfileImage}
               >
                 {isSavingNickname ? (
                   <ActivityIndicator size="small" color="#fff" />
@@ -607,8 +624,8 @@ const PRIMARY_DEEP = "#C7521A";
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#FFFFFF" },
-  container: { flex: 1, backgroundColor: "#FFFFFF" },
-  content: { paddingBottom: 130 },
+  container: { flex: 1, backgroundColor: "#F4F5F7" },
+  content: { paddingTop: 16, paddingBottom: 130 },
   centerState: {
     flex: 1,
     alignItems: "center",
@@ -616,27 +633,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   userCard: {
-    flexDirection: "row",
-    alignItems: "center",
     backgroundColor: "#FFFFFF",
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 22,
-    marginBottom: 8,
+    marginHorizontal: 20,
+    marginBottom: 12,
+    padding: 20,
+    borderRadius: 24,
   },
+  profileTop: { flexDirection: "row", alignItems: "center" },
   avatarWrap: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     backgroundColor: PRIMARY_SOFT,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 14,
+    marginRight: 16,
     overflow: "hidden",
   },
   profileImage: { width: "100%", height: "100%" },
   avatarText: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "800",
     color: PRIMARY_DEEP,
   },
@@ -646,7 +662,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     minWidth: 0,
-    marginBottom: 10,
+    marginBottom: 6,
   },
   username: {
     flexShrink: 1,
@@ -654,12 +670,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: INK1,
   },
-  editNicknameBtn: {
-    width: 30,
-    height: 30,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  profileSub: { fontSize: 13, lineHeight: 19, fontWeight: "600", color: INK3 },
   levelBadge: {
     backgroundColor: PRIMARY,
     paddingHorizontal: 8,
@@ -667,29 +678,44 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   levelText: { fontSize: 10, fontWeight: "800", color: "#fff" },
-  xpRow: { gap: 4 },
+  profileFacts: { gap: 14, marginTop: 24, paddingTop: 20, borderTopWidth: 1, borderTopColor: LINE },
+  profileFactRow: { minHeight: 24, flexDirection: "row", alignItems: "center", gap: 12 },
+  profileFactText: { flex: 1, fontSize: 14, lineHeight: 20, fontWeight: "600", color: INK2 },
+  profileEditButton: {
+    height: 52, borderRadius: 16, marginTop: 22,
+    backgroundColor: "#F2F4F6", alignItems: "center", justifyContent: "center",
+  },
+  profileEditButtonText: { fontSize: 15, fontWeight: "800", color: INK1 },
+  recordCard: {
+    marginHorizontal: 20, marginBottom: 12, padding: 20,
+    borderRadius: 24, backgroundColor: "#FFFFFF",
+  },
+  recordTitle: { fontSize: 18, fontWeight: "800", color: INK1, marginBottom: 20 },
+  xpRow: { gap: 8 },
   xpLabels: {
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 8,
-    marginBottom: 3,
+    marginBottom: 2,
   },
-  xpLabel: { fontSize: 10, color: INK3, fontWeight: "700" },
-  xpNext: { fontSize: 10, color: PRIMARY, fontWeight: "700" },
+  xpLabel: { fontSize: 14, color: INK1, fontWeight: "800" },
+  xpNext: { fontSize: 12, color: PRIMARY, fontWeight: "700" },
   xpBar: {
-    height: 7,
-    backgroundColor: SURFACE,
-    borderRadius: 4,
+    height: 9,
+    backgroundColor: "#ECEFF2",
+    borderRadius: 999,
     overflow: "hidden",
   },
-  xpFill: { height: "100%", backgroundColor: PRIMARY, borderRadius: 4 },
+  xpFill: { height: "100%", backgroundColor: PRIMARY, borderRadius: 999 },
+  xpGuide: { fontSize: 12, lineHeight: 18, color: INK3, fontWeight: "600" },
   statsCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    paddingVertical: 22,
-    paddingHorizontal: 20,
-    marginBottom: 8,
+    backgroundColor: "#F7F8FA",
+    borderRadius: 18,
+    paddingVertical: 18,
+    paddingHorizontal: 8,
+    marginTop: 18,
   },
   statItem: { flex: 1, alignItems: "flex-start", paddingHorizontal: 8 },
   statValue: {
@@ -705,7 +731,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#E6DED7",
     marginVertical: 4,
   },
-  certSection: { paddingTop: 22, paddingBottom: 24, marginBottom: 8, backgroundColor: "#FFFFFF" },
+  certSection: { paddingTop: 20, paddingBottom: 20, marginHorizontal: 20, marginBottom: 12, borderRadius: 24, backgroundColor: "#FFFFFF", overflow: "hidden" },
   certSectionHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -804,7 +830,10 @@ const styles = StyleSheet.create({
   settingsSection: {
     paddingTop: 20,
     paddingBottom: 10,
+    marginHorizontal: 20,
+    borderRadius: 24,
     backgroundColor: "#FFFFFF",
+    overflow: "hidden",
   },
   settingsTitle: {
     paddingHorizontal: 20,
@@ -860,64 +889,37 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: INK2,
   },
-  feedbackSafeArea: { flex: 1, backgroundColor: "#FFF8F2" },
+  feedbackSafeArea: { flex: 1, backgroundColor: "#FFFFFF" },
   feedbackHeader: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
-    paddingHorizontal: 22,
-    paddingTop: 18,
-    paddingBottom: 20,
+    paddingHorizontal: 20,
+    paddingTop: 22,
+    paddingBottom: 24,
   },
-  feedbackEyebrow: {
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 1.2,
-    color: PRIMARY,
-    marginBottom: 6,
-  },
-  feedbackTitle: { fontSize: 24, fontWeight: "800", color: INK1, letterSpacing: -0.6 },
+  feedbackTitle: { fontSize: 26, lineHeight: 34, fontWeight: "800", color: INK1, letterSpacing: -0.7 },
+  feedbackDescription: { marginTop: 8, fontSize: 14, lineHeight: 20, fontWeight: "600", color: INK3 },
   feedbackCloseBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#fff",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginLeft: 12,
+    backgroundColor: "#F2F4F6",
     alignItems: "center",
     justifyContent: "center",
   },
   feedbackForm: { flex: 1, paddingHorizontal: 20, paddingBottom: 14 },
-  feedbackIntro: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
+  feedbackInputCard: {
+    flex: 1,
+    minHeight: 240,
     padding: 16,
     borderRadius: 18,
-    backgroundColor: PRIMARY_SOFT,
-    marginBottom: 14,
-  },
-  feedbackIntroIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    backgroundColor: PRIMARY,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  feedbackIntroIconText: { color: "#fff", fontSize: 20, fontWeight: "800" },
-  feedbackIntroCopy: { flex: 1 },
-  feedbackIntroTitle: { fontSize: 14, fontWeight: "800", color: INK1, marginBottom: 3 },
-  feedbackIntroText: { fontSize: 12, lineHeight: 17, fontWeight: "600", color: INK2 },
-  feedbackInputCard: {
-    minHeight: 220,
-    padding: 16,
-    borderRadius: 20,
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#F0E5DC",
+    backgroundColor: "#F5F6F8",
   },
   feedbackInput: {
     flex: 1,
-    minHeight: 160,
+    minHeight: 180,
     padding: 0,
     fontSize: 15,
     lineHeight: 23,
@@ -938,11 +940,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   feedbackSubmitBtnDisabled: { opacity: 0.4 },
-  feedbackSubmitContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-  },
   feedbackSubmitText: { fontSize: 15, fontWeight: "800", color: "#fff" },
   feedbackPrivacy: {
     marginTop: 10,
