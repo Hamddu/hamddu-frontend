@@ -17,6 +17,7 @@ export interface Content {
   interests: string | null;
   sortOrder: number | null;
   imageUrl: string | null;
+  activeImageUrl: string | null;
   pointApplyable: boolean;
   channel: { id: string; name: string } | null;
   createdAt: string;
@@ -134,12 +135,29 @@ function normalizeComment(raw: any): Comment {
   };
 }
 
+export function countComments(comments: Comment[] = []): number {
+  return comments.reduce(
+    (total, comment) => total + 1 + countComments(comment.children),
+    0,
+  );
+}
+
 export const postsApi = {
   getPosts: async (categoryId?: string): Promise<Post[]> => {
     const params: Record<string, any> = { page: 1, limit: 20, sort: "latest" };
     if (categoryId) params.categoryId = categoryId;
     const res = await apiClient.get("/api/boards", { params });
-    return unwrapList(res.data).map(normalizePost);
+    const posts = unwrapList(res.data).map(normalizePost);
+    // ponytail: one request per post until the boards API returns total commentCount.
+    return Promise.all(
+      posts.map(async (post) => {
+        const comments = await apiClient
+          .get(`/api/boards/${post.id}/comments`)
+          .then((response) => unwrapList(response.data).map(normalizeComment))
+          .catch(() => []);
+        return { ...post, commentCount: countComments(comments) };
+      }),
+    );
   },
 
   getPostById: async (id: string): Promise<Post | null> => {
@@ -150,6 +168,10 @@ export const postsApi = {
   addPost: async (post: { title: string; body: string; categoryId: string; mediaIds?: string[] }): Promise<Post> => {
     const res = await apiClient.post("/api/boards", post);
     return normalizePost(res.data);
+  },
+
+  deletePost: async (id: string): Promise<void> => {
+    await apiClient.delete(`/api/boards/${id}`);
   },
 
   likePost: async (id: string): Promise<LikeResult> => {
@@ -264,6 +286,15 @@ export const pointsApi = {
 export const notificationsApi = {
   registerDeviceToken: async (payload: DeviceTokenPayload): Promise<void> => {
     await apiClient.post("/api/notifications/device-tokens", payload);
+  },
+  unregisterDeviceToken: async (token: string): Promise<void> => {
+    await apiClient.delete(`/api/notifications/device-tokens/${encodeURIComponent(token)}`);
+  },
+};
+
+export const feedbacksApi = {
+  create: async (body: string): Promise<void> => {
+    await apiClient.post("/api/feedbacks", { body });
   },
 };
 

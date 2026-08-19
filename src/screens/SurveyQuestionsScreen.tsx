@@ -6,20 +6,29 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation } from "@tanstack/react-query";
 import { useAuthStore } from "../store/authStore";
 import { submitSurvey } from "../api/users.api";
 
-const AGE_OPTIONS = ["14-18", "19-24", "25-29", "30-34", "35-39", "40-49", "50+"];
+const AGE_OPTIONS = [
+  { label: "14-18", value: "1418" },
+  { label: "19-24", value: "1924" },
+  { label: "25-29", value: "2529" },
+  { label: "30-34", value: "3034" },
+  { label: "35-39", value: "3539" },
+  { label: "40-49", value: "4049" },
+  { label: "50+", value: "50+" },
+];
 const GENDER_OPTIONS = [{ label: "여성", value: "F" }, { label: "남성", value: "M" }];
 const INTEREST_OPTIONS = [{ label: "🥢 대바늘", value: "knitting" }, { label: "🪝 코바늘", value: "crochet" }];
 const ABILITY_OPTIONS = [
-  { label: "입문", desc: "뜨개질이 처음이에요" },
-  { label: "초급", desc: "기초는 알아요" },
-  { label: "중급", desc: "여러 기법을 알아요" },
-  { label: "고급", desc: "뭐든 뜰 수 있어요" },
+  { label: "입문", value: "beginner", desc: "뜨개질이 처음이에요" },
+  { label: "초급", value: "intermediate", desc: "기초는 알아요" },
+  { label: "중급", value: "advanced", desc: "여러 기법을 알아요" },
+  { label: "고급", value: "expert", desc: "뭐든 뜰 수 있어요" },
 ];
 
 export default function SurveyQuestionsScreen() {
@@ -34,7 +43,7 @@ export default function SurveyQuestionsScreen() {
   const submitMutation = useMutation({
     mutationFn: () => submitSurvey({ age, gender, interests: interest, ability }),
     onSuccess: () => setSurveyRequired(false),
-    onError: () => setSurveyRequired(false),
+    onError: () => Alert.alert("저장 실패", "설문을 저장하지 못했어요. 다시 시도해주세요."),
   });
 
   return (
@@ -52,12 +61,12 @@ export default function SurveyQuestionsScreen() {
           <View style={styles.chipRow}>
             {AGE_OPTIONS.map((a) => (
               <TouchableOpacity
-                key={a}
-                style={[styles.chip, age === a && styles.chipActive]}
-                onPress={() => setAge(a)}
+                key={a.value}
+                style={[styles.chip, age === a.value && styles.chipActive]}
+                onPress={() => setAge(a.value)}
                 activeOpacity={0.75}
               >
-                <Text style={[styles.chipText, age === a && styles.chipTextActive]}>{a}</Text>
+                <Text style={[styles.chipText, age === a.value && styles.chipTextActive]}>{a.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -105,14 +114,14 @@ export default function SurveyQuestionsScreen() {
             {ABILITY_OPTIONS.map((a) => (
               <TouchableOpacity
                 key={a.label}
-                style={[styles.abilityCard, ability === a.label && styles.abilityCardActive]}
-                onPress={() => setAbility(a.label)}
+                style={[styles.abilityCard, ability === a.value && styles.abilityCardActive]}
+                onPress={() => setAbility(a.value)}
                 activeOpacity={0.75}
               >
-                <Text style={[styles.abilityLabel, ability === a.label && styles.abilityLabelActive]}>
+                <Text style={[styles.abilityLabel, ability === a.value && styles.abilityLabelActive]}>
                   {a.label}
                 </Text>
-                <Text style={[styles.abilityDesc, ability === a.label && styles.abilityDescActive]}>
+                <Text style={[styles.abilityDesc, ability === a.value && styles.abilityDescActive]}>
                   {a.desc}
                 </Text>
               </TouchableOpacity>
@@ -123,6 +132,9 @@ export default function SurveyQuestionsScreen() {
 
       {/* CTA */}
       <View style={styles.footer}>
+        <TouchableOpacity onPress={() => setSurveyRequired(false)} disabled={submitMutation.isPending}>
+          <Text style={styles.skipText}>건너뛰기</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={[styles.startBtn, (!canSubmit || submitMutation.isPending) && styles.startBtnDisabled]}
           onPress={() => submitMutation.mutate()}
@@ -202,7 +214,8 @@ const styles = StyleSheet.create({
   abilityDescActive: { color: "rgba(255,255,255,0.8)" },
 
   // 하단
-  footer: { padding: 20, paddingBottom: 24 },
+  footer: { padding: 20, paddingBottom: 24, gap: 12 },
+  skipText: { textAlign: "center", fontSize: 14, fontWeight: "700", color: INK3 },
   startBtn: {
     height: 56, borderRadius: 16, backgroundColor: PRIMARY,
     alignItems: "center", justifyContent: "center",

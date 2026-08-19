@@ -14,7 +14,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { useNavigation } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import Svg, { Defs, Mask, Path, type SvgProps } from "react-native-svg";
+import Svg, { Defs, Mask, Path, SvgUri, type SvgProps } from "react-native-svg";
 import BackgroundHamdde from "../../assets/home/background-hamdde.svg";
 import Hat from "../../assets/home/hat.svg";
 import Knitting01Active from "../../assets/home/tutorial/knitting/icon/knitting_01_active.svg";
@@ -141,6 +141,8 @@ interface Lesson {
   state: LessonState;
   pct?: number;
   videoId?: string;
+  imageUrl?: string;
+  activeImageUrl?: string;
 }
 
 const KNITTING_ASSETS: TutorialNodeAsset[] = [
@@ -187,6 +189,18 @@ const CROCHET_NODE_LAYOUT: TutorialNodeLayout[] = [
   { iconX: 69, iconY: 693, popX: 84, popY: 804, popWidth: 92, popHeight: 54 },
 ];
 
+const CROCHET_LAYOUT_INDEX: Record<string, number> = {
+  "매직링 만들기": 0,
+  사슬뜨기: 1,
+  빼뜨기: 2,
+  짧은뜨기: 3,
+  이랑뜨기: 4,
+  긴뜨기: 5,
+  "한길 긴뜨기": 6,
+  "두길 긴뜨기": 7,
+  팝콘뜨기: 8,
+};
+
 function getLessonState(history: WatchHistory | undefined): {
   state: LessonState;
   pct?: number;
@@ -208,6 +222,8 @@ function contentToLesson(
     state,
     pct,
     videoId: content.sourceVideoId ?? undefined,
+    imageUrl: content.imageUrl ?? undefined,
+    activeImageUrl: content.activeImageUrl ?? undefined,
   };
 }
 
@@ -227,14 +243,14 @@ export default function HomeScreen() {
   });
   const lineDraw = useRef(new Animated.Value(0)).current;
   const mapScrollY = useRef(new Animated.Value(0)).current;
-  const heroHeight = mapScrollY.interpolate({
-    inputRange: [0, HERO_COLLAPSE_DISTANCE],
-    outputRange: [HERO_HEIGHT, HERO_COLLAPSED_HEIGHT],
-    extrapolate: "clamp",
-  });
   const heroContentY = mapScrollY.interpolate({
     inputRange: [0, HERO_COLLAPSE_DISTANCE],
     outputRange: [0, -4],
+    extrapolate: "clamp",
+  });
+  const sheetTranslateY = mapScrollY.interpolate({
+    inputRange: [0, HERO_COLLAPSE_DISTANCE],
+    outputRange: [0, -(HERO_HEIGHT - HERO_COLLAPSED_HEIGHT)],
     extrapolate: "clamp",
   });
   const heroPaddingTop = mapScrollY.interpolate({
@@ -349,6 +365,7 @@ export default function HomeScreen() {
 
   const lessons = tutorials
     .filter((c) => c.interests === (category === "knit" ? "knitting" : "crochet"))
+    .sort((a, b) => (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER))
     .map((c) => contentToLesson(c, historyMap[c.id]));
   const selectedLesson =
     selectedIndex === null ? null : lessons[selectedIndex] ?? null;
@@ -361,11 +378,7 @@ export default function HomeScreen() {
   const mapScale = Math.min(1, (windowWidth - 46) / MAP_DESIGN_WIDTH);
   const mapHeight = mapBaseHeight * mapScale;
 
-  const isUnlocked = (index: number) =>
-    index === 0 ||
-    lessons[index]?.state !== "open" ||
-    lessons[index - 1]?.state === "done" ||
-    certifiedContentIds.has(lessons[index - 1]?.contentId);
+  const isUnlocked = (_index: number) => true;
 
   const goToLesson = (lesson: Lesson, index: number) => {
     if (!lesson.videoId || !isUnlocked(index)) return;
@@ -396,7 +409,7 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.root}>
-      <Animated.View style={[styles.hero, { height: heroHeight }]}>
+      <Animated.View style={[styles.hero, { height: HERO_HEIGHT }]}>
         <Animated.View
           style={[
             styles.heroContent,
@@ -483,7 +496,15 @@ export default function HomeScreen() {
         </Animated.View>
       </Animated.View>
 
-      <View style={styles.sheet}>
+      <Animated.View
+        style={[
+          styles.sheet,
+          {
+            marginBottom: -(HERO_HEIGHT - HERO_COLLAPSED_HEIGHT),
+            transform: [{ translateY: sheetTranslateY }],
+          },
+        ]}
+      >
         <View style={styles.sheetTabs}>
           <View pointerEvents="none" style={styles.sheetTabsTopBackground} />
           <View style={styles.segment}>
@@ -547,7 +568,13 @@ export default function HomeScreen() {
                   pointerEvents="none"
                   width={MAP_DESIGN_WIDTH * mapScale}
                   height={744 * mapScale}
-                  style={[styles.crochetMapThread, { top: 85 * mapScale }]}
+                  style={[
+                    styles.crochetMapThread,
+                    {
+                      top: 85 * mapScale,
+                      transform: [{ scaleX: -1 }],
+                    },
+                  ]}
                 />
               ) : (
                 <Svg
@@ -577,13 +604,19 @@ export default function HomeScreen() {
               )}
               {lessons.slice(0, nodeLayouts.length).map((lesson, index) => {
                 const unlocked = isUnlocked(index);
-                const layout = nodeLayouts[index];
-                const asset = nodeAssets[index];
+                const layoutIndex = isCrochet
+                  ? CROCHET_LAYOUT_INDEX[lesson.title] ?? index
+                  : index;
+                const layout = nodeLayouts[layoutIndex];
+                const asset = nodeAssets[layoutIndex];
                 const completed =
                   lesson.state === "done" ||
                   certifiedContentIds.has(lesson.contentId);
                 const NodeIcon = completed ? asset.ActiveIcon : asset.DisabledIcon;
                 const NodePop = completed ? asset.ActivePop : asset.DisabledPop;
+                const iconUrl = completed
+                  ? lesson.activeImageUrl ?? lesson.imageUrl
+                  : lesson.imageUrl;
                 const frameTop = Math.min(layout.iconY, layout.popY);
                 const frameWidth = Math.max(
                   NODE_ICON_SIZE,
@@ -592,6 +625,11 @@ export default function HomeScreen() {
                 const frameHeight =
                   Math.max(layout.iconY + NODE_ICON_SIZE, layout.popY + layout.popHeight) -
                   frameTop;
+                const popOverlapY = isCrochet
+                  ? layout.popY < layout.iconY
+                    ? 6
+                    : -6
+                  : 0;
 
                 return (
                   <TouchableOpacity
@@ -607,18 +645,27 @@ export default function HomeScreen() {
                     ]}
                     onPress={() => setSelectedIndex(index)}
                     activeOpacity={0.82}
-                    disabled={!unlocked}
                   >
-                    <NodeIcon
-                      width={NODE_ICON_SIZE * mapScale}
-                      height={NODE_ICON_SIZE * mapScale}
-                      style={[
-                        styles.nodeIcon,
-                        {
-                          top: (layout.iconY - frameTop) * mapScale,
-                        },
-                      ]}
-                    />
+                    {iconUrl ? (
+                      <SvgUri
+                        uri={iconUrl}
+                        width={NODE_ICON_SIZE * mapScale}
+                        height={NODE_ICON_SIZE * mapScale}
+                        style={[
+                          styles.nodeIcon,
+                          { top: (layout.iconY - frameTop) * mapScale },
+                        ]}
+                      />
+                    ) : (
+                      <NodeIcon
+                        width={NODE_ICON_SIZE * mapScale}
+                        height={NODE_ICON_SIZE * mapScale}
+                        style={[
+                          styles.nodeIcon,
+                          { top: (layout.iconY - frameTop) * mapScale },
+                        ]}
+                      />
+                    )}
                     <NodePop
                       width={layout.popWidth * mapScale}
                       height={layout.popHeight * mapScale}
@@ -626,7 +673,7 @@ export default function HomeScreen() {
                         styles.nodePop,
                         {
                           left: (layout.popX - layout.iconX) * mapScale,
-                          top: (layout.popY - frameTop) * mapScale,
+                          top: (layout.popY - frameTop + popOverlapY) * mapScale,
                         },
                       ]}
                     />
@@ -636,7 +683,7 @@ export default function HomeScreen() {
             </View>
           )}
         </Animated.ScrollView>
-      </View>
+      </Animated.View>
 
       <Modal
         visible={!!selectedLesson}
@@ -687,14 +734,19 @@ export default function HomeScreen() {
               <TouchableOpacity
                 style={[
                   styles.modalStartButton,
-                  !isUnlocked(selectedIndex) && styles.modalStartButtonDisabled,
+                  (!isUnlocked(selectedIndex) || !selectedLesson.videoId) &&
+                    styles.modalStartButtonDisabled,
                 ]}
                 onPress={() => goToLesson(selectedLesson, selectedIndex)}
-                disabled={!isUnlocked(selectedIndex)}
+                disabled={!isUnlocked(selectedIndex) || !selectedLesson.videoId}
                 activeOpacity={0.85}
               >
                 <Text style={styles.modalStartText}>
-                  {selectedLesson.state === "progress"
+                  {!selectedLesson.videoId
+                    ? "영상 준비중"
+                    : !isUnlocked(selectedIndex)
+                      ? "이전 영상 완료 후 열려요"
+                      : selectedLesson.state === "progress"
                     ? "이어보기"
                     : selectedLesson.state === "done" ||
                         certifiedContentIds.has(selectedLesson.contentId)

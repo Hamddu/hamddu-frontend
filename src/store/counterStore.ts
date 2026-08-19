@@ -10,7 +10,7 @@ export interface RowRecord {
 export interface CounterProject {
   id: string;
   name: string;
-  targetStitch: number;
+  targetRow: number;
   currentRow: number;
   currentStitch: number;
   rowRecords: RowRecord[];
@@ -22,6 +22,7 @@ interface CounterStore {
   addProject: (project: CounterProject) => void;
   updateProject: (project: CounterProject) => void;
   deleteProject: (id: string) => void;
+  clearProjects: () => void;
 }
 
 export const useCounterStore = create<CounterStore>()(
@@ -36,10 +37,13 @@ export const useCounterStore = create<CounterStore>()(
         })),
       deleteProject: (id) =>
         set((s) => ({ projects: s.projects.filter((p) => p.id !== id) })),
+      clearProjects: () => set({ projects: [] }),
     }),
     {
       name: "counter-projects",
       storage: createJSONStorage(() => AsyncStorage),
+      version: 1,
+      migrate: (state: any) => ({ ...state, projects: [] }),
     }
   )
 );

@@ -15,17 +15,17 @@ import {
 } from "react-native";
 import { Text, TextInput, Button, Dialog, Portal, RadioButton } from "react-native-paper";
 import RenderHtml from "react-native-render-html";
-import { useRoute } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import type { RouteProp } from "@react-navigation/native";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import axios from "axios";
-import { usePost, useToggleLike } from "../hooks/usePosts";
+import { useDeletePost, usePost, useToggleLike } from "../hooks/usePosts";
 import { useComments, useAddComment, useDeleteComment, useToggleCommentLike } from "../hooks/useComments";
 import { CommunityStackParamList } from "../types/navigation";
 import CommentItem from "../components/CommentItem";
 import { getMyProfile } from "../api/users.api";
-import { commentsApi, postsApi, ReportReason } from "../services/api";
+import { commentsApi, countComments, postsApi, ReportReason } from "../services/api";
 
 const PRIMARY = "#FF7325";
 const PRIMARY_SOFT = "#FFE6D6";
@@ -72,6 +72,7 @@ function getApiErrorMessage(error: unknown): string {
 
 export default function PostDetailScreen() {
   const route = useRoute<PostDetailRouteProp>();
+  const navigation = useNavigation();
   const { postId } = route.params;
   const headerHeight = useHeaderHeight();
 
@@ -84,6 +85,7 @@ export default function PostDetailScreen() {
   } = useComments(postId);
   const { data: myProfile } = useQuery({ queryKey: ["profile", "me"], queryFn: getMyProfile });
   const { toggle: toggleLike } = useToggleLike();
+  const deletePostMutation = useDeletePost();
   const addCommentMutation = useAddComment();
   const deleteCommentMutation = useDeleteComment();
   const toggleCommentLikeMutation = useToggleCommentLike();
@@ -94,6 +96,7 @@ export default function PostDetailScreen() {
   const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
   const [reportReason, setReportReason] = useState<ReportReason>("spam");
   const [reportDescription, setReportDescription] = useState("");
+  const totalCommentCount = comments ? countComments(comments) : (post?.commentCount ?? 0);
 
   const reportMutation = useMutation({
     mutationFn: ({ target, reason, description }: { target: ReportTarget; reason: ReportReason; description?: string }) =>
@@ -124,6 +127,12 @@ export default function PostDetailScreen() {
           setCommentText("");
           setReplyTo(null);
         },
+        onError: (error) => {
+          const message = axios.isAxiosError(error)
+            ? error.response?.data?.errorMessage ?? error.response?.data?.message
+            : null;
+          Alert.alert("댓글 등록 실패", message ?? "댓글을 등록하지 못했어요.");
+        },
       },
     );
   };
@@ -135,6 +144,20 @@ export default function PostDetailScreen() {
         text: "삭제",
         style: "destructive",
         onPress: () => deleteCommentMutation.mutate({ postId, commentId }),
+      },
+    ]);
+  };
+
+  const handleDeletePost = () => {
+    Alert.alert("게시글 삭제", "게시글을 삭제할까요?", [
+      { text: "취소", style: "cancel" },
+      {
+        text: "삭제",
+        style: "destructive",
+        onPress: () => deletePostMutation.mutate(postId, {
+          onSuccess: () => navigation.goBack(),
+          onError: () => Alert.alert("삭제 실패", "게시글을 삭제하지 못했어요."),
+        }),
       },
     ]);
   };
@@ -193,6 +216,7 @@ export default function PostDetailScreen() {
 
   const categoryName = post.category?.name ?? "";
   const authorName = post.author?.nickname ?? "익명";
+  const isMine = !!myProfile?.id && post.author?.id === myProfile.id;
   const avatarText = authorName.slice(0, 2);
   const media = (post as any).media ?? [];
   const tags = (post as any).tags ?? [];
@@ -223,8 +247,12 @@ export default function PostDetailScreen() {
                 <Text style={styles.authorMeta}>{authorMeta}</Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.headerReportBtn} onPress={() => openReportDialog({ type: "post", id: post.id })}>
-              <Text style={styles.headerReportText}>신고</Text>
+            <TouchableOpacity
+              style={styles.headerReportBtn}
+              onPress={isMine ? handleDeletePost : () => openReportDialog({ type: "post", id: post.id })}
+              disabled={deletePostMutation.isPending}
+            >
+              <Text style={styles.headerReportText}>{isMine ? "삭제" : "신고"}</Text>
             </TouchableOpacity>
           </View>
 
@@ -274,7 +302,7 @@ export default function PostDetailScreen() {
             </TouchableOpacity>
             <View style={styles.actionBtn}>
               <Text style={styles.actionIcon}>💬</Text>
-              <Text style={styles.actionCount}>{post.commentCount}</Text>
+              <Text style={styles.actionCount}>{totalCommentCount}</Text>
             </View>
             <TouchableOpacity style={styles.actionBtn} onPress={handleShare} activeOpacity={0.75}>
               <Text style={styles.actionLabel}>공유</Text>
@@ -285,7 +313,7 @@ export default function PostDetailScreen() {
         <View style={styles.commentsSection}>
           <View style={styles.commentsHeader}>
             <Text style={styles.commentsTitle}>댓글</Text>
-            <Text style={styles.commentsCount}>{comments?.length || 0}</Text>
+            <Text style={styles.commentsCount}>{totalCommentCount}</Text>
           </View>
 
           {commentsLoading ? (
@@ -307,9 +335,9 @@ export default function PostDetailScreen() {
                   currentUser={myProfile?.nickname ?? ""}
                   onDelete={handleDeleteComment}
                   onLike={(comment) => toggleCommentLikeMutation.mutate({ postId, comment })}
-                  onReply={(comment) =>
+                  onReply={(comment, parentId) =>
                     setReplyTo({
-                      id: comment.id,
+                      id: parentId,
                       nickname: comment.author?.nickname ?? "익명",
                     })
                   }
@@ -363,44 +391,55 @@ export default function PostDetailScreen() {
       </View>
 
       <Portal>
-        <Dialog visible={!!reportTarget} onDismiss={() => setReportTarget(null)}>
-          <Dialog.Title>{reportTarget?.type === "post" ? "게시글 신고" : "댓글 신고"}</Dialog.Title>
-          <Dialog.Content>
-            <RadioButton.Group
-              onValueChange={(value) => setReportReason(value as ReportReason)}
-              value={reportReason}
-            >
-              {REPORT_REASONS.map((reason) => (
-                <RadioButton.Item
-                  key={reason.value}
-                  label={reason.label}
-                  value={reason.value}
-                  color={PRIMARY}
-                  labelStyle={styles.reportReasonLabel}
+        <KeyboardAvoidingView
+          style={styles.dialogKeyboardAvoider}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <Dialog visible={!!reportTarget} onDismiss={() => setReportTarget(null)}>
+            <Dialog.Title>{reportTarget?.type === "post" ? "게시글 신고" : "댓글 신고"}</Dialog.Title>
+            <Dialog.Content>
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                automaticallyAdjustKeyboardInsets
+                contentContainerStyle={styles.reportContent}
+              >
+                <RadioButton.Group
+                  onValueChange={(value) => setReportReason(value as ReportReason)}
+                  value={reportReason}
+                >
+                  {REPORT_REASONS.map((reason) => (
+                    <RadioButton.Item
+                      key={reason.value}
+                      label={reason.label}
+                      value={reason.value}
+                      color={PRIMARY}
+                      labelStyle={styles.reportReasonLabel}
+                    />
+                  ))}
+                </RadioButton.Group>
+                <TextInput
+                  value={reportDescription}
+                  onChangeText={setReportDescription}
+                  placeholder="상세 내용을 입력해주세요. (선택)"
+                  mode="outlined"
+                  multiline
+                  maxLength={1000}
+                  style={styles.reportDescription}
+                  outlineColor={LINE}
+                  activeOutlineColor={PRIMARY}
                 />
-              ))}
-            </RadioButton.Group>
-            <TextInput
-              value={reportDescription}
-              onChangeText={setReportDescription}
-              placeholder="상세 내용을 입력해주세요. (선택)"
-              mode="outlined"
-              multiline
-              maxLength={1000}
-              style={styles.reportDescription}
-              outlineColor={LINE}
-              activeOutlineColor={PRIMARY}
-            />
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setReportTarget(null)} disabled={reportMutation.isPending}>
-              취소
-            </Button>
-            <Button onPress={submitReport} loading={reportMutation.isPending} disabled={reportMutation.isPending}>
-              신고
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
+              </ScrollView>
+            </Dialog.Content>
+            <Dialog.Actions>
+              <Button onPress={() => setReportTarget(null)} disabled={reportMutation.isPending}>
+                취소
+              </Button>
+              <Button onPress={submitReport} loading={reportMutation.isPending} disabled={reportMutation.isPending}>
+                신고
+              </Button>
+            </Dialog.Actions>
+          </Dialog>
+        </KeyboardAvoidingView>
       </Portal>
     </KeyboardAvoidingView>
   );
@@ -689,6 +728,13 @@ const styles = StyleSheet.create({
   reportReasonLabel: {
     fontSize: 14,
     color: INK2,
+  },
+  dialogKeyboardAvoider: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  reportContent: {
+    paddingBottom: 8,
   },
   reportDescription: {
     maxHeight: 120,

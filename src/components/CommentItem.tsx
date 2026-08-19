@@ -15,9 +15,10 @@ interface CommentItemProps {
   currentUser?: string;
   onDelete?: (commentId: string) => void;
   onLike?: (comment: Comment) => void;
-  onReply?: (comment: Comment) => void;
+  onReply?: (comment: Comment, parentId: string) => void;
   onReport?: (comment: Comment) => void;
   depth?: number;
+  rootCommentId?: string;
 }
 
 function getTimeAgo(dateStr: string): string {
@@ -41,6 +42,7 @@ export default function CommentItem({
   onReply,
   onReport,
   depth = 0,
+  rootCommentId = comment.id,
 }: CommentItemProps) {
   const authorName = comment.author?.nickname ?? "익명";
   const isOwner = authorName === currentUser;
@@ -80,7 +82,7 @@ export default function CommentItem({
             </Text>
             <Text style={styles.likeCount}>{comment.likeCount}</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => onReply?.(comment)}>
+          <TouchableOpacity onPress={() => onReply?.(comment, rootCommentId)}>
             <Text style={styles.replyText}>답글 달기</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => onReport?.(comment)}>
@@ -110,6 +112,7 @@ export default function CommentItem({
             onReply={onReply}
             onReport={onReport}
             depth={depth + 1}
+            rootCommentId={rootCommentId}
           />
         ))}
       </View>

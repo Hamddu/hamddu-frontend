@@ -35,6 +35,17 @@ export const useAddPost = () => {
   });
 };
 
+export const useDeletePost = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: postsApi.deletePost,
+    onSuccess: (_, postId) => {
+      queryClient.removeQueries({ queryKey: postKeys.detail(postId) });
+      queryClient.invalidateQueries({ queryKey: postKeys.lists() });
+    },
+  });
+};
+
 export const useLikePost = () => {
   const queryClient = useQueryClient();
   return useMutation({

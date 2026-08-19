@@ -42,7 +42,7 @@ function CounterDetail({
   const [saveModal, setSaveModal] = useState(false);
   const [projectName, setProjectName] = useState(project.name);
   const [editingName, setEditingName] = useState(false);
-  const targetStitch = project.targetStitch ?? 0;
+  const targetRow = project.targetRow ?? 0;
 
   const tens = Math.floor((stitch % 100) / 10);
   const ones = stitch % 10;
@@ -77,12 +77,7 @@ function CounterDetail({
   };
 
   const handlePlusOne = () => {
-    const next = stitch + 1;
-    if (targetStitch > 0 && next >= targetStitch) {
-      handleNextRow(next);
-    } else {
-      setStitch(next);
-    }
+    setStitch(stitch + 1);
   };
 
   const handleSave = () => {
@@ -188,13 +183,13 @@ function CounterDetail({
               </View>
             </View>
 
-            {/* 목표 코수 진행 */}
-            {targetStitch > 0 && (
+            {/* 목표 단수 진행 */}
+            {targetRow > 0 && (
               <View style={styles.targetRow}>
                 <View style={styles.targetBar}>
-                  <View style={[styles.targetFill, { width: `${Math.min((stitch / targetStitch) * 100, 100)}%` as any }]} />
+                  <View style={[styles.targetFill, { width: `${Math.min((row / targetRow) * 100, 100)}%` as any }]} />
                 </View>
-                <Text style={styles.targetLabel}>{stitch} / {targetStitch}코</Text>
+                <Text style={styles.targetLabel}>{row} / {targetRow}단</Text>
               </View>
             )}
 
@@ -307,7 +302,7 @@ export default function CounterScreen() {
     const newProject: CounterProject = {
       id: Date.now().toString(),
       name: newName.trim() || "새 프로젝트",
-      targetStitch: isNaN(target) || target <= 0 ? 0 : target,
+      targetRow: isNaN(target) || target <= 0 ? 0 : target,
       currentRow: 1,
       currentStitch: 0,
       rowRecords: [],
@@ -425,7 +420,7 @@ export default function CounterScreen() {
               placeholderTextColor="#AAAAAA"
               returnKeyType="next"
             />
-            <Text style={styles.inputLabel}>목표 코수 <Text style={styles.inputLabelOpt}>(선택)</Text></Text>
+            <Text style={styles.inputLabel}>목표 단수 <Text style={styles.inputLabelOpt}>(선택)</Text></Text>
             <TextInput
               style={styles.nameInput}
               value={newTarget}

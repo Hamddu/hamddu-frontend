@@ -18,7 +18,6 @@ export async function loginWithOAuth(provider: OAuthProvider): Promise<OAuthResu
   const result = await WebBrowser.openAuthSessionAsync(
     `${API_BASE_URL}/api/auth/${provider}?app_redirect=${encodeURIComponent(redirectUri)}`,
     redirectUri,
-    { preferEphemeralSession: true },
   );
 
   if (result.type !== 'success') {

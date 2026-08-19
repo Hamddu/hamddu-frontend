@@ -80,7 +80,7 @@ export default function SurveyScreen() {
       navigation.navigate("SurveyQuestions");
     },
     onError: () => {
-      navigation.navigate("SurveyQuestions");
+      setNickStatus("error");
     },
   });
 

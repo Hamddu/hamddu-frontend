@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   StyleSheet,
   ScrollView,
@@ -80,6 +80,10 @@ export default function AddPostScreen() {
     queryKey: ['categories'],
     queryFn: categoriesApi.getCategories,
   });
+
+  useEffect(() => {
+    if (!categoryId && categories.length > 0) setCategoryId(categories[0].id);
+  }, [categories, categoryId]);
 
   const bodyText = stripHtml(body);
   const isValid = title.trim().length > 0 && bodyText.length > 0 && !!categoryId;

@@ -1,11 +1,11 @@
 import React, { useEffect, useRef } from "react";
-import { Animated, Text, TouchableOpacity, Vibration } from "react-native";
+import { Animated, Text, TouchableOpacity } from "react-native";
 import { NavigationContainer, getFocusedRouteNameFromRoute } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Provider as PaperProvider } from "react-native-paper";
 import type { SvgProps } from "react-native-svg";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 
 import HomeActiveIcon from "./assets/tab-icons/home_active.svg";
 import HomeDisabledIcon from "./assets/tab-icons/home_disabled.svg";
@@ -28,8 +28,8 @@ import SurveyScreen from "./src/screens/SurveyScreen";
 import SurveyQuestionsScreen from "./src/screens/SurveyQuestionsScreen";
 
 import { useAuthStore } from "./src/store/authStore";
-import { useXpLevelDetection } from "./src/hooks/useXpLevelUp";
 import { registerForPushNotifications } from "./src/services/notifications";
+import { useCounterStore } from "./src/store/counterStore";
 
 const Tab = createBottomTabNavigator();
 const HomeStack = createNativeStackNavigator();
@@ -193,9 +193,6 @@ function MainTabs() {
         headerShown: false,
       };
       }}
-      screenListeners={{
-        tabPress: () => Vibration.vibrate(10),
-      }}
     >
       <Tab.Screen
         name="Home"
@@ -260,15 +257,30 @@ function MainTabs() {
 }
 
 function AppInitializer({ children }: { children: React.ReactNode }) {
-  useXpLevelDetection();
   const accessToken = useAuthStore((s) => s.accessToken);
+  const clearProjects = useCounterStore((s) => s.clearProjects);
+  const queryClient = useQueryClient();
+  const previousToken = useRef(accessToken);
+
+  useEffect(() => {
+    if (previousToken.current && !accessToken) {
+      clearProjects();
+      queryClient.clear();
+    }
+    previousToken.current = accessToken;
+  }, [accessToken, clearProjects, queryClient]);
 
   useEffect(() => {
     if (!accessToken) return;
 
-    registerForPushNotifications().catch((error) => {
-      console.warn("Failed to register push notifications", error);
-    });
+    let cleanup: (() => void) | undefined;
+    registerForPushNotifications()
+      .then((unsubscribe) => {
+        cleanup = unsubscribe;
+      })
+      .catch((error) => console.warn("Failed to register push notifications", error));
+
+    return () => cleanup?.();
   }, [accessToken]);
 
   return <>{children}</>;

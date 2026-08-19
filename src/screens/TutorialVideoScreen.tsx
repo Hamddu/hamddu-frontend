@@ -37,6 +37,35 @@ const SPEEDS = [
   { label: "1.5x", value: 1.5 },
 ];
 const MIN_WATCH_SECONDS_TO_COMPLETE = 30;
+const DISABLE_YOUTUBE_CAPTIONS_SCRIPT = `
+  (function () {
+    function disableCaptions(target) {
+      if (!target) return;
+      if (typeof target.setOption === 'function') {
+        target.setOption('captions', 'track', {});
+      }
+      if (typeof target.unloadModule === 'function') {
+        target.unloadModule('captions');
+      }
+    }
+
+    var originalOnPlayerReady = window.onPlayerReady;
+    window.onPlayerReady = function (event) {
+      disableCaptions(event.target);
+      if (typeof originalOnPlayerReady === 'function') {
+        return originalOnPlayerReady(event);
+      }
+    };
+
+    var attempts = 0;
+    var timer = setInterval(function () {
+      disableCaptions(window.player);
+      attempts += 1;
+      if (attempts >= 20) clearInterval(timer);
+    }, 500);
+  })();
+  true;
+`;
 
 function timestampToSeconds(timestamp?: string): number {
   const parts = timestamp?.split(":").map(Number);
@@ -328,7 +357,13 @@ export default function TutorialVideoScreen() {
               videoId={videoId}
               play={isPlaying}
               playbackRate={speed}
-              initialPlayerParams={{ controls: false, rel: false, preventFullScreen: true }}
+              webViewProps={{ injectedJavaScript: DISABLE_YOUTUBE_CAPTIONS_SCRIPT }}
+              initialPlayerParams={{
+                controls: false,
+                rel: false,
+                preventFullScreen: true,
+                showClosedCaptions: false,
+              }}
               onPlaybackRateChange={(nextSpeed: number) => setSpeed(nextSpeed)}
               onChangeState={(state: string) => {
                 if (state === "playing") setIsPlaying(true);
@@ -560,8 +595,8 @@ export default function TutorialVideoScreen() {
             <Text style={styles.warnIcon}>📵</Text>
             <Text style={styles.warnTitle}>캡처가 감지되었어요</Text>
             <Text style={styles.warnDesc}>
-              튜토리얼 영상의 캡처는 허용되지 않습니다.{'\n'}
-              다시 한 번 더 시도하지 말아주세요!
+              튜토리얼은 저작권으로 보호되는 콘텐츠입니다.{"\n"}
+              캡처 화면을 무단으로 공유하거나 배포할 경우 법적 책임이 발생할 수 있어요.
             </Text>
             <TouchableOpacity
               style={styles.warnBtn}
