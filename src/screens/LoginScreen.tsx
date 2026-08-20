@@ -40,8 +40,10 @@ export default function LoginScreen() {
       setAccessToken(accessToken);
       if (refreshToken) setRefreshToken(refreshToken);
       if (surveyRequired) {
+        // 온보딩 완료 지표는 surveyCompleted 하나뿐.
+        // (백엔드가 닉네임을 기본 배정해도 설문 미완료면 온보딩을 거쳐야 함)
         const profile = await getMyProfile().catch(() => null);
-        setSurveyRequired(!profile?.surveyCompleted && !profile?.nickname);
+        setSurveyRequired(!profile?.surveyCompleted);
       } else {
         setSurveyRequired(false);
       }
