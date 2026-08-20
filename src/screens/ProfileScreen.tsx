@@ -20,7 +20,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFocusEffect } from "@react-navigation/native";
 import { useAuthStore } from "../store/authStore";
 import { unregisterPushNotifications } from "../services/notifications";
-import { getMyProfile, updateProfile } from "../api/users.api";
+import { getMyProfile, updateProfile, deleteAccount } from "../api/users.api";
 import { xpApi, pointsApi, challengesApi, feedbacksApi, nicknamesApi, Challenge } from "../services/api";
 import ChallengeImagePlaceholder from "../components/ChallengeImagePlaceholder";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -181,6 +181,30 @@ export default function ProfileScreen() {
     } finally {
       logout();
     }
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "회원 탈퇴",
+      "정말 탈퇴하시겠어요?\n계정과 활동 정보에 더 이상 접근할 수 없어요.",
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "탈퇴하기",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await unregisterPushNotifications().catch(() => {});
+              await deleteAccount();
+            } catch {
+              Alert.alert("탈퇴 실패", "잠시 후 다시 시도해주세요.");
+              return;
+            }
+            logout();
+          },
+        },
+      ],
+    );
   };
 
   const {
@@ -451,6 +475,16 @@ export default function ProfileScreen() {
             </View>
           </TouchableOpacity>
         </View>
+
+        <TouchableOpacity
+          style={styles.withdrawBtn}
+          onPress={handleDeleteAccount}
+          activeOpacity={0.6}
+          accessibilityRole="button"
+          accessibilityLabel="회원 탈퇴"
+        >
+          <Text style={styles.withdrawText}>회원 탈퇴</Text>
+        </TouchableOpacity>
       </ScrollView>
 
       <Modal visible={certModalVisible} animationType="slide">
@@ -853,6 +887,8 @@ const styles = StyleSheet.create({
   settingsDivider: { height: 1, marginLeft: 53, backgroundColor: LINE },
   feedbackBtnText: { fontSize: 15, fontWeight: "700", color: INK1 },
   logoutBtnText: { fontSize: 15, fontWeight: "700", color: "#E5484D" },
+  withdrawBtn: { alignSelf: "center", marginTop: 20, marginBottom: 12, paddingVertical: 8, paddingHorizontal: 16 },
+  withdrawText: { fontSize: 12, color: "#BDBDBD", textDecorationLine: "underline" },
   modalSafeArea: {
     flex: 1,
     backgroundColor: "#fff",
