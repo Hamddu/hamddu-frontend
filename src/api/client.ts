@@ -23,13 +23,19 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true;
       try {
+        // 웹은 쿠키, 모바일은 저장해둔 refresh 토큰을 body로 전달
+        const refreshToken = useAuthStore.getState().refreshToken;
         const res = await axios.post(
           `${API_BASE_URL}/api/auth/refresh`,
-          {},
+          { refreshToken },
           { withCredentials: true },
         );
         const newToken = res.data.accessToken;
         useAuthStore.getState().setAccessToken(newToken);
+        // 서버가 회전한 새 refresh 토큰을 내려주면 저장 (재사용 감지 회피)
+        if (res.data.refreshToken) {
+          useAuthStore.getState().setRefreshToken(res.data.refreshToken);
+        }
         original.headers.Authorization = `Bearer ${newToken}`;
         return apiClient(original);
       } catch {

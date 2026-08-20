@@ -29,15 +29,16 @@ const GOOGLE_ICON = require("../../assets/login/google.png");
 export default function LoginScreen() {
   const [loading, setLoading] = useState<"google" | "naver" | null>(null);
   const [legalDocument, setLegalDocument] = useState<"terms" | "privacy" | null>(null);
-  const { setAccessToken, setSurveyRequired } = useAuthStore();
+  const { setAccessToken, setRefreshToken, setSurveyRequired } = useAuthStore();
   const { width, height } = useWindowDimensions();
   const scale = Math.min(width / 451, height / 980);
 
   async function handleLogin(provider: "google" | "naver") {
     setLoading(provider);
     try {
-      const { accessToken, surveyRequired } = await loginWithOAuth(provider);
+      const { accessToken, refreshToken, surveyRequired } = await loginWithOAuth(provider);
       setAccessToken(accessToken);
+      if (refreshToken) setRefreshToken(refreshToken);
       if (surveyRequired) {
         const profile = await getMyProfile().catch(() => null);
         setSurveyRequired(!profile?.surveyCompleted && !profile?.nickname);

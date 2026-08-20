@@ -9,6 +9,7 @@ export type OAuthProvider = 'google' | 'naver';
 
 export interface OAuthResult {
   accessToken: string;
+  refreshToken: string | null;
   surveyRequired: boolean;
 }
 
@@ -27,16 +28,19 @@ export async function loginWithOAuth(provider: OAuthProvider): Promise<OAuthResu
   const url = result.url;
   const params = new URLSearchParams(url.split('?')[1] ?? '');
   const accessToken = params.get('access_token');
+  const refreshToken = params.get('refresh_token');
   const surveyRequired = params.get('survey_required') === 'true';
 
   if (!accessToken) {
     throw new Error('토큰을 받지 못했습니다.');
   }
 
-  return { accessToken, surveyRequired };
+  return { accessToken, refreshToken, surveyRequired };
 }
 
 export async function logout(): Promise<void> {
   const { apiClient } = await import('./client');
-  await apiClient.post('/api/auth/logout');
+  const { useAuthStore } = await import('../store/authStore');
+  const refreshToken = useAuthStore.getState().refreshToken;
+  await apiClient.post('/api/auth/logout', { refreshToken });
 }
