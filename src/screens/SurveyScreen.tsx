@@ -30,10 +30,6 @@ const FALLBACK_NICKNAMES = [
   "라벤더뜨개", "민트실뭉치", "복숭아바늘", "하늘빛코바늘", "눈송이뜨개",
 ];
 
-function CheckIcon() { return <Text style={{ fontSize: 13, color: "#4FB17A" }}>✓</Text>; }
-function CrossIcon() { return <Text style={{ fontSize: 13, color: "#E55B4B" }}>✕</Text>; }
-function InfoIcon() { return <Text style={{ fontSize: 13, color: "#8A8A8A" }}>i</Text>; }
-
 export default function SurveyScreen() {
   const navigation = useNavigation<NavigationProp>();
   const queryClient = useQueryClient();
@@ -94,11 +90,11 @@ export default function SurveyScreen() {
   }, []);
 
   const statusConfig = {
-    ok:       { color: "#4FB17A", icon: <CheckIcon />, msg: "사용 가능한 닉네임이에요" },
-    duplicate:{ color: "#E55B4B", icon: <CrossIcon />, msg: "이미 사용 중인 닉네임이에요" },
-    editing:  { color: "#8A8A8A", icon: <InfoIcon />,  msg: "2~30자, 한글/영문/숫자/공백만 가능" },
-    loading:  { color: "#8A8A8A", icon: <InfoIcon />,  msg: "확인 중..." },
-    error:    { color: "#FF7325", icon: <InfoIcon />,  msg: "서버 오류 - 그래도 등록해볼 수 있어요" },
+    ok:        { color: OK,     msg: "사용할 수 있는 닉네임이에요" },
+    duplicate: { color: DANGER, msg: "이미 사용 중인 닉네임이에요" },
+    editing:   { color: HINT,   msg: "2~30자, 한글·영문·숫자·공백만 가능해요" },
+    loading:   { color: HINT,   msg: "확인 중..." },
+    error:     { color: PRIMARY,msg: "서버 오류 · 그래도 등록해볼 수 있어요" },
   };
   const status = statusConfig[nickStatus];
 
@@ -137,107 +133,95 @@ export default function SurveyScreen() {
   const canSubmit = (nickStatus === "ok" || nickStatus === "error") && (nick ?? "").trim().length >= 2;
   const isSubmitting = registerMutation.isPending;
 
+  const borderStyle =
+    nickStatus === "duplicate" ? styles.fieldDanger
+    : nickStatus === "ok" ? styles.fieldOk
+    : nickStatus === "editing" ? styles.fieldFocus
+    : null;
+
   return (
-    <SafeAreaView style={styles.flex}>
+    <SafeAreaView style={styles.flex} edges={["top", "left", "right"]}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <View style={styles.navBar} />
+        {/* 진행바 1/2 */}
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: "50%" }]} />
+        </View>
 
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-          <Text style={styles.sparkle}>✱</Text>
-          <Text style={styles.headline}>나를 표현할{"\n"}프로필을 만들어요</Text>
-          <Text style={styles.sub}>마술봉을 누르면 랜덤 닉네임을 받아와요.{"\n"}최대 {MAX_RANDOM}번까지 시도할 수 있어요.</Text>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Text style={styles.headline}>어떤 닉네임으로{"\n"}활동할까요?</Text>
+          <Text style={styles.sub}>마술봉으로 랜덤 추천을 받아볼 수 있어요.</Text>
 
           <View style={styles.avatarSection}>
-            <View style={styles.avatarWrap}>
-              <View style={styles.avatarGlow} />
-              <View style={styles.avatarCircle}>
-                <Text style={styles.avatarEmoji}>🐹</Text>
-              </View>
-              <TouchableOpacity
-                style={[styles.wandBtn, randomExhausted && styles.wandBtnDisabled]}
-                onPress={handleRandom}
-                activeOpacity={0.85}
-                disabled={randomExhausted || issueMutation.isPending}
-              >
-                {issueMutation.isPending ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <>
-                    <Text style={styles.wandIcon}>✦</Text>
-                    <Text style={styles.wandText}>랜덤</Text>
-                  </>
-                )}
-              </TouchableOpacity>
+            <View style={styles.avatarCircle}>
+              <Text style={styles.avatarEmoji}>🐹</Text>
             </View>
+            <TouchableOpacity
+              style={[styles.randomPill, randomExhausted && styles.randomPillDisabled]}
+              onPress={handleRandom}
+              activeOpacity={0.8}
+              disabled={randomExhausted || issueMutation.isPending}
+            >
+              {issueMutation.isPending ? (
+                <ActivityIndicator size="small" color={SUB} />
+              ) : (
+                <Text style={styles.randomPillText}>✨ 랜덤 추천</Text>
+              )}
+            </TouchableOpacity>
             <Text style={[styles.avatarHint, randomExhausted && styles.avatarHintWarn]}>
               {randomExhausted
                 ? "랜덤 시도 횟수를 모두 사용했어요"
-                : `✨ 랜덤 남은 횟수 ${MAX_RANDOM - randomCount}번`}
+                : `남은 횟수 ${MAX_RANDOM - randomCount}번`}
             </Text>
           </View>
 
-          <View style={styles.nickSection}>
-            <View style={styles.nickLabelRow}>
-              <Text style={styles.nickLabel}>닉네임</Text>
-              <Text style={[styles.nickCount, randomExhausted && { color: "#E55B4B" }]}>
-                랜덤 {randomCount} / {MAX_RANDOM}
-              </Text>
-            </View>
-
-            <View style={[
-              styles.nickInputWrap,
-              nickStatus === "duplicate" && styles.nickInputDuplicate,
-              nickStatus === "editing"   && styles.nickInputEditing,
-              nickStatus === "ok"        && styles.nickInputOk,
-            ]}>
-              <TextInput
-                style={styles.nickInput}
-                value={nick}
-                onChangeText={handleNickChange}
-                placeholder="닉네임을 입력하세요"
-                placeholderTextColor="#AAAAAA"
-                maxLength={30}
-                returnKeyType="done"
-              />
-              {nickStatus === "loading" ? (
-                <ActivityIndicator size="small" color="#FF7325" style={{ marginRight: 12 }} />
-              ) : nickStatus === "ok" ? (
-                <TouchableOpacity
-                  style={[styles.randSmallBtn, randomExhausted && styles.randSmallBtnDisabled]}
-                  onPress={handleRandom}
-                  disabled={randomExhausted || issueMutation.isPending}
-                >
-                  <Text style={styles.randSmallIcon}>↻</Text>
-                  <Text style={styles.randSmallText}>{randomExhausted ? "소진" : "랜덤"}</Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity style={styles.checkBtn} onPress={handleCheckDuplicate}>
-                  <Text style={styles.checkBtnText}>{nickStatus === "error" ? "재시도" : "중복 확인"}</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            <View style={styles.statusRow}>
-              {status.icon}
-              <Text style={[styles.statusMsg, { color: status.color }]}>{status.msg}</Text>
-            </View>
+          <Text style={styles.fieldLabel}>닉네임</Text>
+          <View style={[styles.field, borderStyle]}>
+            <TextInput
+              style={styles.fieldInput}
+              value={nick}
+              onChangeText={handleNickChange}
+              placeholder="닉네임을 입력하세요"
+              placeholderTextColor={HINT}
+              maxLength={30}
+              returnKeyType="done"
+            />
+            {nickStatus === "loading" ? (
+              <ActivityIndicator size="small" color={PRIMARY} style={{ marginRight: 14 }} />
+            ) : nickStatus === "ok" ? (
+              <TouchableOpacity
+                style={[styles.inlineGhostBtn, randomExhausted && { opacity: 0.4 }]}
+                onPress={handleRandom}
+                disabled={randomExhausted || issueMutation.isPending}
+              >
+                <Text style={styles.inlineGhostText}>{randomExhausted ? "소진" : "↻ 랜덤"}</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.inlineBtn} onPress={handleCheckDuplicate}>
+                <Text style={styles.inlineBtnText}>{nickStatus === "error" ? "재시도" : "중복확인"}</Text>
+              </TouchableOpacity>
+            )}
           </View>
+          <Text style={[styles.statusMsg, { color: status.color }]}>{status.msg}</Text>
         </ScrollView>
 
         <View style={styles.footer}>
           <TouchableOpacity
-            style={[styles.startBtn, (!canSubmit || isSubmitting) && styles.startBtnDisabled]}
+            style={[styles.cta, (!canSubmit || isSubmitting) && styles.ctaDisabled]}
             onPress={handleSubmit}
             disabled={!canSubmit || isSubmitting}
-            activeOpacity={0.85}
+            activeOpacity={0.9}
           >
             {isSubmitting ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <Text style={styles.startBtnText}>이 프로필로 시작하기</Text>
+              <Text style={[styles.ctaText, (!canSubmit || isSubmitting) && styles.ctaTextDisabled]}>다음</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -247,50 +231,61 @@ export default function SurveyScreen() {
 }
 
 const PRIMARY = "#FF7325";
-const PRIMARY_DEEP = "#C7521A";
-const INK1 = "#1A1A1A";
-const INK2 = "#404040";
-const INK3 = "#8A8A8A";
-const LINE = "#ECECEC";
+const INK = "#191F28";
+const SUB = "#4E5968";
+const HINT = "#8B95A1";
+const LINE = "#E5E8EB";
+const FILL = "#F2F4F6";
+const OK = "#15C47E";
+const DANGER = "#F04452";
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: "#FFFFFF" },
-  navBar: { height: 48 },
+
+  progressTrack: { height: 4, backgroundColor: FILL, borderRadius: 2, marginHorizontal: 24, marginTop: 8 },
+  progressFill: { height: 4, backgroundColor: PRIMARY, borderRadius: 2 },
+
   scroll: { flex: 1 },
-  scrollContent: { padding: 24, paddingTop: 0 },
-  sparkle: { fontSize: 22, color: PRIMARY, fontWeight: "800", marginBottom: 6 },
-  headline: { fontSize: 26, fontWeight: "800", color: INK1, letterSpacing: -0.8, lineHeight: 34, marginBottom: 10 },
-  sub: { fontSize: 13, color: INK3, lineHeight: 20, marginBottom: 32 },
-  avatarSection: { alignItems: "center", marginBottom: 32 },
-  avatarWrap: { position: "relative", alignItems: "center", justifyContent: "center", marginBottom: 10 },
-  avatarGlow: { position: "absolute", width: 196, height: 196, borderRadius: 98, backgroundColor: "rgba(255,115,37,0.12)" },
-  avatarCircle: { width: 148, height: 148, borderRadius: 74, backgroundColor: "#fff", borderWidth: 1, borderColor: LINE, alignItems: "center", justifyContent: "center" },
-  avatarEmoji: { fontSize: 80 },
-  wandBtn: { position: "absolute", bottom: 0, right: -8, height: 44, paddingHorizontal: 14, paddingLeft: 10, borderRadius: 22, backgroundColor: INK1, borderWidth: 3, borderColor: "#fff", flexDirection: "row", alignItems: "center", gap: 5 },
-  wandBtnDisabled: { backgroundColor: "#AAAAAA" },
-  wandIcon: { fontSize: 13, color: "#fff" },
-  wandText: { fontSize: 12, fontWeight: "800", color: "#fff" },
-  avatarHint: { fontSize: 12, color: INK3, fontWeight: "600" },
-  avatarHintWarn: { color: "#E55B4B" },
-  nickSection: { gap: 0 },
-  nickLabelRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 },
-  nickLabel: { fontSize: 13, fontWeight: "700", color: INK2 },
-  nickCount: { fontSize: 11, color: INK3 },
-  nickInputWrap: { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 14, paddingLeft: 16, paddingRight: 4, paddingVertical: 4, borderWidth: 1.5, borderColor: LINE, gap: 8 },
-  nickInputOk: { borderColor: "#4FB17A" },
-  nickInputEditing: { borderColor: INK1 },
-  nickInputDuplicate: { borderColor: "#E55B4B" },
-  nickInput: { flex: 1, height: 40, fontSize: 15, fontWeight: "700", color: INK1, padding: 0 },
-  checkBtn: { height: 36, paddingHorizontal: 14, borderRadius: 10, backgroundColor: PRIMARY, alignItems: "center", justifyContent: "center" },
-  checkBtnText: { fontSize: 12, fontWeight: "800", color: "#fff" },
-  randSmallBtn: { height: 36, paddingHorizontal: 12, borderRadius: 10, backgroundColor: "#F5F5F5", flexDirection: "row", alignItems: "center", gap: 4 },
-  randSmallBtnDisabled: { backgroundColor: "#F5F5F5", opacity: 0.5 },
-  randSmallIcon: { fontSize: 14, color: INK2 },
-  randSmallText: { fontSize: 12, fontWeight: "700", color: INK2 },
-  statusRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 8 },
-  statusMsg: { fontSize: 12, fontWeight: "600" },
-  footer: { padding: 20, paddingBottom: 24 },
-  startBtn: { height: 56, borderRadius: 16, backgroundColor: PRIMARY, alignItems: "center", justifyContent: "center", shadowColor: PRIMARY_DEEP, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 1, shadowRadius: 0, elevation: 5 },
-  startBtnDisabled: { backgroundColor: "#D0D0D0", shadowColor: "transparent", elevation: 0 },
-  startBtnText: { fontSize: 16, fontWeight: "800", color: "#fff" },
+  scrollContent: { paddingHorizontal: 24, paddingTop: 28 },
+
+  headline: { fontSize: 24, fontWeight: "700", color: INK, lineHeight: 33, letterSpacing: -0.5 },
+  sub: { fontSize: 15, color: HINT, lineHeight: 22, marginTop: 10 },
+
+  avatarSection: { alignItems: "center", marginTop: 36, marginBottom: 36 },
+  avatarCircle: {
+    width: 132, height: 132, borderRadius: 66, backgroundColor: FILL,
+    alignItems: "center", justifyContent: "center",
+  },
+  avatarEmoji: { fontSize: 72 },
+  randomPill: {
+    marginTop: 16, height: 40, paddingHorizontal: 18, borderRadius: 20,
+    backgroundColor: FILL, alignItems: "center", justifyContent: "center", minWidth: 120,
+  },
+  randomPillDisabled: { opacity: 0.5 },
+  randomPillText: { fontSize: 14, fontWeight: "700", color: SUB },
+  avatarHint: { fontSize: 13, color: HINT, marginTop: 10, fontWeight: "500" },
+  avatarHintWarn: { color: DANGER },
+
+  fieldLabel: { fontSize: 14, fontWeight: "700", color: SUB, marginBottom: 10 },
+  field: {
+    flexDirection: "row", alignItems: "center",
+    height: 58, backgroundColor: FILL, borderRadius: 14,
+    paddingLeft: 18, paddingRight: 6,
+    borderWidth: 1.5, borderColor: "transparent",
+  },
+  fieldFocus: { borderColor: "#D1D6DB" },
+  fieldOk: { borderColor: OK },
+  fieldDanger: { borderColor: DANGER },
+  fieldInput: { flex: 1, fontSize: 17, fontWeight: "700", color: INK, padding: 0 },
+  inlineBtn: { height: 42, paddingHorizontal: 16, borderRadius: 10, backgroundColor: PRIMARY, alignItems: "center", justifyContent: "center" },
+  inlineBtnText: { fontSize: 14, fontWeight: "700", color: "#fff" },
+  inlineGhostBtn: { height: 42, paddingHorizontal: 14, borderRadius: 10, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
+  inlineGhostText: { fontSize: 14, fontWeight: "700", color: SUB },
+  statusMsg: { fontSize: 13, fontWeight: "600", marginTop: 10, marginLeft: 4 },
+
+  footer: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16 },
+  cta: { height: 56, borderRadius: 14, backgroundColor: PRIMARY, alignItems: "center", justifyContent: "center" },
+  ctaDisabled: { backgroundColor: LINE },
+  ctaText: { fontSize: 17, fontWeight: "700", color: "#fff" },
+  ctaTextDisabled: { color: HINT },
 });

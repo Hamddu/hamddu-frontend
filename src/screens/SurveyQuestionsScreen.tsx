@@ -47,104 +47,117 @@ export default function SurveyQuestionsScreen() {
   });
 
   return (
-    <SafeAreaView style={styles.flex}>
-      {/* 헤더 */}
+    <SafeAreaView style={styles.flex} edges={["top", "left", "right"]}>
+      {/* 진행바 2/2 */}
+      <View style={styles.progressTrack}>
+        <View style={[styles.progressFill, { width: "100%" }]} />
+      </View>
+
       <View style={styles.header}>
-        <Text style={styles.step}>2 / 2</Text>
         <Text style={styles.title}>취향을 알려주세요</Text>
-        <Text style={styles.sub}>맞춤 콘텐츠를 추천해드릴게요</Text>
+        <Text style={styles.sub}>맞춤 콘텐츠를 추천해드릴게요.</Text>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         {/* 나이 */}
         <Section title="나이대">
           <View style={styles.chipRow}>
-            {AGE_OPTIONS.map((a) => (
-              <TouchableOpacity
-                key={a.value}
-                style={[styles.chip, age === a.value && styles.chipActive]}
-                onPress={() => setAge(a.value)}
-                activeOpacity={0.75}
-              >
-                <Text style={[styles.chipText, age === a.value && styles.chipTextActive]}>{a.label}</Text>
-              </TouchableOpacity>
-            ))}
+            {AGE_OPTIONS.map((a) => {
+              const on = age === a.value;
+              return (
+                <TouchableOpacity
+                  key={a.value}
+                  style={[styles.chip, on && styles.chipOn]}
+                  onPress={() => setAge(a.value)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.chipText, on && styles.chipTextOn]}>{a.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </Section>
 
         {/* 성별 */}
         <Section title="성별">
           <View style={styles.segRow}>
-            {GENDER_OPTIONS.map((g) => (
-              <TouchableOpacity
-                key={g.value}
-                style={[styles.seg, gender === g.value && styles.segActive]}
-                onPress={() => setGender(g.value)}
-                activeOpacity={0.75}
-              >
-                <Text style={[styles.segText, gender === g.value && styles.segTextActive]}>
-                  {g.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {GENDER_OPTIONS.map((g) => {
+              const on = gender === g.value;
+              return (
+                <TouchableOpacity
+                  key={g.value}
+                  style={[styles.seg, on && styles.segOn]}
+                  onPress={() => setGender(g.value)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.segText, on && styles.segTextOn]}>{g.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </Section>
 
         {/* 관심 분야 */}
         <Section title="관심 분야">
           <View style={styles.segRow}>
-            {INTEREST_OPTIONS.map((i) => (
-              <TouchableOpacity
-                key={i.value}
-                style={[styles.seg, interest === i.value && styles.segActive]}
-                onPress={() => setInterest(i.value)}
-                activeOpacity={0.75}
-              >
-                <Text style={[styles.segText, interest === i.value && styles.segTextActive]}>
-                  {i.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {INTEREST_OPTIONS.map((i) => {
+              const on = interest === i.value;
+              return (
+                <TouchableOpacity
+                  key={i.value}
+                  style={[styles.seg, on && styles.segOn]}
+                  onPress={() => setInterest(i.value)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.segText, on && styles.segTextOn]}>{i.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </Section>
 
         {/* 실력 */}
         <Section title="뜨개 실력">
           <View style={styles.abilityGrid}>
-            {ABILITY_OPTIONS.map((a) => (
-              <TouchableOpacity
-                key={a.label}
-                style={[styles.abilityCard, ability === a.value && styles.abilityCardActive]}
-                onPress={() => setAbility(a.value)}
-                activeOpacity={0.75}
-              >
-                <Text style={[styles.abilityLabel, ability === a.value && styles.abilityLabelActive]}>
-                  {a.label}
-                </Text>
-                <Text style={[styles.abilityDesc, ability === a.value && styles.abilityDescActive]}>
-                  {a.desc}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {ABILITY_OPTIONS.map((a) => {
+              const on = ability === a.value;
+              return (
+                <TouchableOpacity
+                  key={a.label}
+                  style={[styles.abilityCard, on && styles.abilityCardOn]}
+                  onPress={() => setAbility(a.value)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.abilityLabel, on && styles.abilityLabelOn]}>{a.label}</Text>
+                  <Text style={[styles.abilityDesc, on && styles.abilityDescOn]}>{a.desc}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </Section>
       </ScrollView>
 
       {/* CTA */}
       <View style={styles.footer}>
-        <TouchableOpacity onPress={() => setSurveyRequired(false)} disabled={submitMutation.isPending}>
+        <TouchableOpacity
+          onPress={() => setSurveyRequired(false)}
+          disabled={submitMutation.isPending}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
           <Text style={styles.skipText}>건너뛰기</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.startBtn, (!canSubmit || submitMutation.isPending) && styles.startBtnDisabled]}
+          style={[styles.cta, (!canSubmit || submitMutation.isPending) && styles.ctaDisabled]}
           onPress={() => submitMutation.mutate()}
           disabled={!canSubmit || submitMutation.isPending}
-          activeOpacity={0.85}
+          activeOpacity={0.9}
         >
           {submitMutation.isPending ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.startBtnText}>함뜨 시작하기 🐹</Text>
+            <Text style={[styles.ctaText, (!canSubmit || submitMutation.isPending) && styles.ctaTextDisabled]}>
+              시작하기
+            </Text>
           )}
         </TouchableOpacity>
       </View>
@@ -162,66 +175,65 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 const PRIMARY = "#FF7325";
-const PRIMARY_DEEP = "#C7521A";
-const INK1 = "#1A1A1A";
-const INK2 = "#404040";
-const INK3 = "#8A8A8A";
-const LINE = "#ECECEC";
+const PRIMARY_SOFT = "#FFF1E9";
+const INK = "#191F28";
+const SUB = "#4E5968";
+const HINT = "#8B95A1";
+const LINE = "#E5E8EB";
+const FILL = "#F2F4F6";
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: "#FFFFFF" },
-  header: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
-  step: { fontSize: 12, fontWeight: "700", color: PRIMARY, letterSpacing: 0.4, marginBottom: 6 },
-  title: { fontSize: 26, fontWeight: "800", color: INK1, letterSpacing: -0.8, marginBottom: 6 },
-  sub: { fontSize: 13, color: INK3, lineHeight: 20 },
+
+  progressTrack: { height: 4, backgroundColor: FILL, borderRadius: 2, marginHorizontal: 24, marginTop: 8 },
+  progressFill: { height: 4, backgroundColor: PRIMARY, borderRadius: 2 },
+
+  header: { paddingHorizontal: 24, paddingTop: 28, paddingBottom: 8 },
+  title: { fontSize: 24, fontWeight: "700", color: INK, letterSpacing: -0.5 },
+  sub: { fontSize: 15, color: HINT, lineHeight: 22, marginTop: 10 },
+
   scroll: { flex: 1 },
-  scrollContent: { padding: 24, paddingTop: 8, gap: 28 },
-  section: { gap: 12 },
-  sectionTitle: { fontSize: 14, fontWeight: "800", color: INK1, letterSpacing: -0.2 },
+  scrollContent: { padding: 24, paddingTop: 12, gap: 32 },
+  section: { gap: 14 },
+  sectionTitle: { fontSize: 16, fontWeight: "700", color: INK, letterSpacing: -0.3 },
 
   // 나이 칩
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
-    height: 36, paddingHorizontal: 14, borderRadius: 999,
-    backgroundColor: "#fff", borderWidth: 1.5, borderColor: LINE,
-    alignItems: "center", justifyContent: "center",
+    height: 42, paddingHorizontal: 18, borderRadius: 21,
+    backgroundColor: FILL, alignItems: "center", justifyContent: "center",
   },
-  chipActive: { backgroundColor: INK1, borderColor: INK1 },
-  chipText: { fontSize: 13, fontWeight: "600", color: INK2 },
-  chipTextActive: { color: "#fff", fontWeight: "800" },
+  chipOn: { backgroundColor: PRIMARY },
+  chipText: { fontSize: 14, fontWeight: "700", color: SUB },
+  chipTextOn: { color: "#fff" },
 
   // 성별/관심
-  segRow: { flexDirection: "row", gap: 8 },
+  segRow: { flexDirection: "row", gap: 10 },
   seg: {
-    flex: 1, height: 48, borderRadius: 14,
-    backgroundColor: "#fff", borderWidth: 1.5, borderColor: LINE,
-    alignItems: "center", justifyContent: "center",
+    flex: 1, height: 54, borderRadius: 14,
+    backgroundColor: FILL, alignItems: "center", justifyContent: "center",
   },
-  segActive: { backgroundColor: INK1, borderColor: INK1 },
-  segText: { fontSize: 14, fontWeight: "700", color: INK2 },
-  segTextActive: { color: "#fff", fontWeight: "800" },
+  segOn: { backgroundColor: PRIMARY },
+  segText: { fontSize: 15, fontWeight: "700", color: SUB },
+  segTextOn: { color: "#fff" },
 
   // 실력
-  abilityGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  abilityGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   abilityCard: {
-    width: "47%", padding: 16, borderRadius: 16,
-    backgroundColor: "#fff", borderWidth: 1.5, borderColor: LINE,
+    width: "47.5%", padding: 18, borderRadius: 16,
+    backgroundColor: FILL, borderWidth: 1.5, borderColor: "transparent",
   },
-  abilityCardActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
-  abilityLabel: { fontSize: 15, fontWeight: "800", color: INK1, marginBottom: 4 },
-  abilityLabelActive: { color: "#fff" },
-  abilityDesc: { fontSize: 12, color: INK3 },
-  abilityDescActive: { color: "rgba(255,255,255,0.8)" },
+  abilityCardOn: { backgroundColor: PRIMARY_SOFT, borderColor: PRIMARY },
+  abilityLabel: { fontSize: 16, fontWeight: "700", color: INK, marginBottom: 5 },
+  abilityLabelOn: { color: PRIMARY },
+  abilityDesc: { fontSize: 13, color: HINT, fontWeight: "500" },
+  abilityDescOn: { color: "#E06A1F" },
 
   // 하단
-  footer: { padding: 20, paddingBottom: 24, gap: 12 },
-  skipText: { textAlign: "center", fontSize: 14, fontWeight: "700", color: INK3 },
-  startBtn: {
-    height: 56, borderRadius: 16, backgroundColor: PRIMARY,
-    alignItems: "center", justifyContent: "center",
-    shadowColor: PRIMARY_DEEP, shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 1, shadowRadius: 0, elevation: 5,
-  },
-  startBtnDisabled: { backgroundColor: "#D0D0D0", shadowColor: "transparent", elevation: 0 },
-  startBtnText: { fontSize: 16, fontWeight: "800", color: "#fff" },
+  footer: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16, gap: 14 },
+  skipText: { textAlign: "center", fontSize: 15, fontWeight: "600", color: HINT },
+  cta: { height: 56, borderRadius: 14, backgroundColor: PRIMARY, alignItems: "center", justifyContent: "center" },
+  ctaDisabled: { backgroundColor: LINE },
+  ctaText: { fontSize: 17, fontWeight: "700", color: "#fff" },
+  ctaTextDisabled: { color: HINT },
 });
