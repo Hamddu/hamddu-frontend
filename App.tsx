@@ -22,7 +22,7 @@ import HomeScreen from "./src/screens/HomeScreen";
 import TutorialVideoScreen from "./src/screens/TutorialVideoScreen";
 import CounterScreen from "./src/screens/CounterScreen";
 import CommunityScreen from "./src/screens/CommunityScreen";
-import ProfileScreen from "./src/screens/ProfileScreen";
+import ProfileScreen, { MyChallengesScreen } from "./src/screens/ProfileScreen";
 import PostDetailScreen from "./src/screens/PostDetailScreen";
 import ChallengeDetailScreen from "./src/screens/ChallengeDetailScreen";
 import AddPostScreen from "./src/screens/AddPostScreen";
@@ -175,12 +175,17 @@ function ProfileStackNavigator() {
       screenOptions={({ navigation }) => ({
         header: () => <CommunityHeader onBack={navigation.goBack} />,
         contentStyle: { backgroundColor: WHITE },
+        animation: "slide_from_right",
       })}
     >
       <ProfileStack.Screen
         name="MyProfile"
         component={ProfileScreen}
         options={{ headerShown: false }}
+      />
+      <ProfileStack.Screen
+        name="MyChallenges"
+        component={MyChallengesScreen}
       />
       <ProfileStack.Screen
         name="ChallengeDetail"

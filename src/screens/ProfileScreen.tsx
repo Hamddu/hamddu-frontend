@@ -12,10 +12,7 @@ import {
   TextInput,
   Alert,
 } from "react-native";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -102,12 +99,43 @@ function CertCard({
   );
 }
 
+export function MyChallengesScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
+  const { data: challenges = [], isLoading } = useQuery({
+    queryKey: ["challenges", "my"],
+    queryFn: challengesApi.getMyChallenges,
+  });
+
+  return (
+    <SafeAreaView edges={["left", "right", "bottom"]} style={styles.modalSafeArea}>
+      <View style={styles.modalHeader}>
+        <View>
+          <Text style={styles.modalTitle}>나의 인증 게시글</Text>
+          <Text style={styles.modalSub}>전체 {challenges.length}개</Text>
+        </View>
+      </View>
+      {isLoading ? (
+        <ActivityIndicator size="small" color={PRIMARY} style={{ marginTop: 40 }} />
+      ) : (
+        <ScrollView contentContainerStyle={styles.modalGrid}>
+          {challenges.map((item) => (
+            <CertCard
+              key={item.id}
+              item={item}
+              wide
+              onPress={() => navigation.navigate("ChallengeDetail", { challengeId: item.id })}
+            />
+          ))}
+        </ScrollView>
+      )}
+    </SafeAreaView>
+  );
+}
+
 export default function ProfileScreen() {
   const logout = useAuthStore((s) => s.logout);
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const queryClient = useQueryClient();
-  const insets = useSafeAreaInsets();
-  const [certModalVisible, setCertModalVisible] = useState(false);
   const [nicknameModalVisible, setNicknameModalVisible] = useState(false);
   const [nickname, setNickname] = useState("");
   const [isSavingNickname, setIsSavingNickname] = useState(false);
@@ -324,13 +352,6 @@ export default function ProfileScreen() {
     }
   }, [refetchProfile, refetchXp, refetchPoints, refetchMyChallenges]);
 
-  const openChallengeDetail = (challengeId: string) => {
-    setCertModalVisible(false);
-    requestAnimationFrame(() => {
-      navigation.navigate("ChallengeDetail", { challengeId });
-    });
-  };
-
   if (profileLoading) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -476,12 +497,9 @@ export default function ProfileScreen() {
           <View style={styles.certSectionHeader}>
             <View>
               <Text style={styles.certSectionTitle}>나의 인증 게시글</Text>
-              <Text style={styles.certSectionSub}>
-                튜토리얼을 완료하면 여기에 모여요
-              </Text>
             </View>
             <TouchableOpacity
-              onPress={() => setCertModalVisible(true)}
+              onPress={() => navigation.navigate("MyChallenges")}
               disabled={myChallenges.length === 0}
               activeOpacity={0.75}
             >
@@ -521,7 +539,11 @@ export default function ProfileScreen() {
               contentContainerStyle={styles.certCarousel}
             >
               {myChallenges.slice(0, 6).map((item) => (
-                <CertCard key={item.id} item={item} />
+                <CertCard
+                  key={item.id}
+                  item={item}
+                  onPress={() => navigation.navigate("ChallengeDetail", { challengeId: item.id })}
+                />
               ))}
             </ScrollView>
           )}
@@ -560,40 +582,6 @@ export default function ProfileScreen() {
           <Text style={styles.withdrawText}>회원 탈퇴</Text>
         </TouchableOpacity>
       </ScrollView>
-
-      <Modal visible={certModalVisible} animationType="slide">
-        <SafeAreaView
-          edges={["left", "right"]}
-          style={[
-            styles.modalSafeArea,
-            { paddingTop: insets.top, paddingBottom: insets.bottom },
-          ]}
-        >
-          <View style={styles.modalHeader}>
-            <View>
-              <Text style={styles.modalTitle}>나의 인증 게시글</Text>
-              <Text style={styles.modalSub}>전체 {myChallenges.length}개</Text>
-            </View>
-            <TouchableOpacity
-              style={styles.modalCloseBtn}
-              onPress={() => setCertModalVisible(false)}
-              activeOpacity={0.75}
-            >
-              <Text style={styles.modalCloseText}>닫기</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView contentContainerStyle={styles.modalGrid}>
-            {myChallenges.map((item) => (
-              <CertCard
-                key={item.id}
-                item={item}
-                wide
-                onPress={() => openChallengeDetail(item.id)}
-              />
-            ))}
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
 
       <Modal
         visible={feedbackModalVisible}
@@ -686,7 +674,7 @@ export default function ProfileScreen() {
             <TextInput
               style={styles.nicknameInput}
               value={nickname}
-              onChangeText={setNickname}
+              onChangeText={(text) => setNickname(text.replace(/[^가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9 ]/g, ""))}
               placeholder="닉네임을 입력해주세요"
               placeholderTextColor={INK3}
               maxLength={30}
@@ -856,12 +844,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "800",
     color: INK1,
-  },
-  certSectionSub: {
-    fontSize: 12,
-    color: INK3,
-    fontWeight: "600",
-    marginTop: 2,
   },
   certSectionAll: {
     fontSize: 12,

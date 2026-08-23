@@ -34,6 +34,7 @@ export type CounterStackParamList = {
 
 export type ProfileStackParamList = {
   MyProfile: undefined;
+  MyChallenges: undefined;
   ChallengeDetail: { challengeId: string };
 };
 

@@ -3,7 +3,11 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { useMutation } from "@tanstack/react-query";
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import type { SvgProps } from "react-native-svg";
+import KnittingIcon from "../../assets/onboarding/knitting.svg";
+import KnittingActiveIcon from "../../assets/onboarding/knitting-active.svg";
+import CrochetIcon from "../../assets/onboarding/crochet.svg";
+import CrochetActiveIcon from "../../assets/onboarding/crochet-active.svg";
 import { useAuthStore } from "../store/authStore";
 import { submitSurvey } from "../api/users.api";
 
@@ -15,8 +19,8 @@ const AGE_OPTIONS = [
 ];
 const GENDER_OPTIONS = [{ label: "여성", value: "F" }, { label: "남성", value: "M" }];
 const INTEREST_OPTIONS = [
-  { label: "대바늘", value: "knitting", desc: "포근한 옷과 소품을 떠요", icon: "needle" as const },
-  { label: "코바늘", value: "crochet", desc: "귀여운 인형과 소품을 떠요", icon: "hook" as const },
+  { label: "대바늘", value: "knitting", desc: "포근한 옷과 소품을 떠요", icon: KnittingIcon, activeIcon: KnittingActiveIcon },
+  { label: "코바늘", value: "crochet", desc: "귀여운 인형과 소품을 떠요", icon: CrochetIcon, activeIcon: CrochetActiveIcon },
 ];
 const ABILITY_OPTIONS = [
   { label: "입문", value: "beginner", desc: "이제 막 뜨개를 시작해요" },
@@ -82,7 +86,7 @@ export default function SurveyQuestionsScreen() {
             <Option key={option.value} label={option.label} selected={gender === option.value} onPress={() => setGender(option.value)} />
           ))}
           {step === 2 && INTEREST_OPTIONS.map((option) => (
-            <Option key={option.value} label={option.label} description={option.desc} icon={option.icon} selected={interest === option.value} onPress={() => setInterest(option.value)} />
+            <Option key={option.value} label={option.label} description={option.desc} icon={option.icon} activeIcon={option.activeIcon} selected={interest === option.value} onPress={() => setInterest(option.value)} />
           ))}
           {step === 3 && ABILITY_OPTIONS.map((option) => (
             <Option key={option.value} label={option.label} description={option.desc} selected={ability === option.value} onPress={() => setAbility(option.value)} />
@@ -106,9 +110,10 @@ export default function SurveyQuestionsScreen() {
   );
 }
 
-function Option({ label, description, icon, selected, onPress }: {
-  label: string; description?: string; icon?: "needle" | "hook"; selected: boolean; onPress: () => void;
+function Option({ label, description, icon, activeIcon, selected, onPress }: {
+  label: string; description?: string; icon?: React.ComponentType<SvgProps>; activeIcon?: React.ComponentType<SvgProps>; selected: boolean; onPress: () => void;
 }) {
+  const Icon = selected ? activeIcon ?? icon : icon;
   return (
     <TouchableOpacity
       style={[styles.option, selected && styles.optionSelected]}
@@ -117,9 +122,9 @@ function Option({ label, description, icon, selected, onPress }: {
       accessibilityRole="radio"
       accessibilityState={{ checked: selected }}
     >
-      {icon ? (
-        <View style={[styles.optionIcon, selected && styles.optionIconSelected]}>
-          <MaterialCommunityIcons name={icon} size={26} color={selected ? PRIMARY : SUB} />
+      {Icon ? (
+        <View style={styles.optionIcon}>
+          <Icon width={50} height={50} />
         </View>
       ) : null}
       <View style={styles.optionCopy}>
@@ -154,8 +159,7 @@ const styles = StyleSheet.create({
   options: { marginTop: 36, gap: 10 },
   option: { minHeight: 68, paddingHorizontal: 18, paddingVertical: 15, borderRadius: 16, backgroundColor: FILL, borderWidth: 1.5, borderColor: "transparent", flexDirection: "row", alignItems: "center" },
   optionSelected: { backgroundColor: "#FFF4ED", borderColor: PRIMARY },
-  optionIcon: { width: 44, height: 44, marginRight: 12, borderRadius: 14, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
-  optionIconSelected: { backgroundColor: "#FFE5D5" },
+  optionIcon: { width: 54, height: 52, marginRight: 12, alignItems: "center", justifyContent: "center" },
   optionCopy: { flex: 1 },
   optionLabel: { fontSize: 17, fontWeight: "700", color: SUB },
   optionLabelSelected: { color: PRIMARY },
