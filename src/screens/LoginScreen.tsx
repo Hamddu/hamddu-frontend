@@ -29,7 +29,7 @@ const GOOGLE_ICON = require("../../assets/login/google.png");
 export default function LoginScreen() {
   const [loading, setLoading] = useState<"google" | "naver" | null>(null);
   const [legalDocument, setLegalDocument] = useState<"terms" | "privacy" | null>(null);
-  const { setAccessToken, setRefreshToken, setSurveyRequired } = useAuthStore();
+  const setSession = useAuthStore((state) => state.setSession);
   const { width, height } = useWindowDimensions();
   const scale = Math.min(width / 451, height / 980);
 
@@ -37,9 +37,7 @@ export default function LoginScreen() {
     setLoading(provider);
     try {
       const { accessToken, refreshToken, surveyRequired } = await loginWithOAuth(provider);
-      if (refreshToken) setRefreshToken(refreshToken);
-      setSurveyRequired(surveyRequired);
-      setAccessToken(accessToken);
+      setSession(accessToken, refreshToken, surveyRequired);
     } catch (e: any) {
       Alert.alert("로그인 실패", e.message ?? "다시 시도해주세요.");
     } finally {

@@ -6,6 +6,7 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   surveyRequired: boolean;
+  setSession: (accessToken: string, refreshToken: string | null, surveyRequired: boolean) => void;
   setAccessToken: (token: string) => void;
   setRefreshToken: (token: string) => void;
   setProfileRequired: (required: boolean) => void;
@@ -19,6 +20,8 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       refreshToken: null,
       surveyRequired: false,
+      setSession: (accessToken, refreshToken, surveyRequired) =>
+        set({ accessToken, refreshToken, surveyRequired }),
       setAccessToken: (token) => set({ accessToken: token }),
       setRefreshToken: (token) => set({ refreshToken: token }),
       setProfileRequired: (required) => set({ surveyRequired: required }),

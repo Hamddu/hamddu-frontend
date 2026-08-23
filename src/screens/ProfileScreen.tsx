@@ -18,6 +18,7 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useAuthStore } from "../store/authStore";
 import { unregisterPushNotifications } from "../services/notifications";
+import { logout as logoutFromApi } from "../api/auth.api";
 import { getMyProfile, updateProfile, deleteAccount } from "../api/users.api";
 import { xpApi, pointsApi, challengesApi, feedbacksApi, nicknamesApi, Challenge } from "../services/api";
 import ChallengeImagePlaceholder from "../components/ChallengeImagePlaceholder";
@@ -274,6 +275,7 @@ export default function ProfileScreen() {
     } catch (error) {
       console.warn("Failed to unregister push notifications", error);
     } finally {
+      await logoutFromApi().catch((error) => console.warn("Failed to logout from server", error));
       logout();
     }
   };
