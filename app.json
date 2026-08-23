@@ -12,7 +12,7 @@
     },
     "assetBundlePatterns": ["**/*"],
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.hamddu.app",
       "googleServicesFile": "./GoogleService-Info.plist",
       "entitlements": {
