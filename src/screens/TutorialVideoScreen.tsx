@@ -15,12 +15,14 @@ import {
   Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Linking,
 } from "react-native";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { HomeStackParamList } from "../types/navigation";
-import { watchHistoryApi, challengesApi } from "../services/api";
+import { watchHistoryApi, challengesApi, contentsApi, channelsApi } from "../services/api";
 import { pickAndUploadImage } from "../services/imageUpload";
 import { useScreenshotProtection } from "../hooks/useScreenshotProtection";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -31,6 +33,7 @@ const YoutubePlayer =
     : null;
 
 type RouteType = RouteProp<HomeStackParamList, "TutorialVideo">;
+type NavigationType = NativeStackNavigationProp<HomeStackParamList>;
 
 const SPEEDS = [
   { label: "0.5x", value: 0.5 },
@@ -94,7 +97,7 @@ function formatDuration(seconds: number): string {
 }
 
 export default function TutorialVideoScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationType>();
   const route = useRoute<RouteType>();
   const {
     videoId,
@@ -120,6 +123,17 @@ export default function TutorialVideoScreen() {
   const playerRef = useRef<any>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queryClient = useQueryClient();
+  const [creatorModalVisible, setCreatorModalVisible] = useState(false);
+  const { data: content } = useQuery({
+    queryKey: ["contents", contentId],
+    queryFn: () => contentsApi.getById(contentId),
+    enabled: !!contentId,
+  });
+  const { data: channel, isLoading: channelLoading } = useQuery({
+    queryKey: ["channels", content?.channel?.id],
+    queryFn: () => channelsApi.getById(content!.channel!.id),
+    enabled: !!content?.channel?.id,
+  });
 
   const saveHistory = useMutation({
     mutationFn: watchHistoryApi.save,
@@ -472,7 +486,30 @@ export default function TutorialVideoScreen() {
       >
         <View style={styles.titleSection}>
           <Text style={styles.titleEyebrow}>영상 튜토리얼</Text>
-          <Text style={styles.videoTitle} onLongPress={() => setShowScreenshotWarn(true)}>{title}</Text>
+          <Text style={styles.videoTitle} onLongPress={() => setShowScreenshotWarn(true)}>{content?.name ?? title}</Text>
+          {content?.channel && (
+            <TouchableOpacity
+              style={styles.creatorRow}
+              onPress={() => setCreatorModalVisible(true)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={`${content.channel.name} 채널 보기`}
+            >
+              {(channel?.profileImageUrl ?? content.channel.profileImageUrl) ? (
+                <Image
+                  source={{ uri: (channel?.profileImageUrl ?? content.channel.profileImageUrl)! }}
+                  style={styles.creatorAvatar}
+                />
+              ) : (
+                <View style={[styles.creatorAvatar, styles.creatorAvatarFallback]}>
+                  <Text style={styles.creatorAvatarText}>{content.channel.name.slice(0, 1)}</Text>
+                </View>
+              )}
+              <View style={styles.creatorText}>
+                <Text style={styles.creatorName} numberOfLines={1}>{content.channel.name}</Text>
+              </View>
+            </TouchableOpacity>
+          )}
           <Text style={styles.videoDesc}>
             영상을 따라 천천히 연습해보세요. 처음엔 느리게, 익숙해지면 빠르게!
           </Text>
@@ -547,6 +584,64 @@ export default function TutorialVideoScreen() {
           </View>
         )}
       </ScrollView>
+
+      <Modal
+        visible={creatorModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setCreatorModalVisible(false)}
+      >
+        <View style={styles.creatorModalBackdrop}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            onPress={() => setCreatorModalVisible(false)}
+            activeOpacity={1}
+          />
+          <View style={styles.creatorModalCard}>
+            <TouchableOpacity
+              style={styles.creatorModalClose}
+              onPress={() => setCreatorModalVisible(false)}
+              accessibilityRole="button"
+              accessibilityLabel="제작자 정보 닫기"
+            >
+              <Ionicons name="close" size={24} color={INK1} />
+            </TouchableOpacity>
+            {(channel?.profileImageUrl ?? content?.channel?.profileImageUrl) ? (
+              <Image
+                source={{ uri: (channel?.profileImageUrl ?? content?.channel?.profileImageUrl)! }}
+                style={styles.creatorModalAvatar}
+              />
+            ) : (
+              <View style={[styles.creatorModalAvatar, styles.creatorAvatarFallback]}>
+                <Text style={styles.creatorModalAvatarText}>{content?.channel?.name.slice(0, 1)}</Text>
+              </View>
+            )}
+            <Text style={styles.creatorModalLabel}>제작자</Text>
+            <Text style={styles.creatorModalName}>{channel?.name ?? content?.channel?.name}</Text>
+            {channelLoading ? (
+              <ActivityIndicator style={styles.creatorModalLoading} color={PRIMARY} />
+            ) : channel?.description ? (
+              <Text style={styles.creatorModalDescription}>{channel.description}</Text>
+            ) : null}
+            {!!channel?.links.length && (
+              <View style={styles.creatorModalLinks}>
+                {channel.links.map((link, index) => (
+                  <TouchableOpacity
+                    key={`${link.url}-${index}`}
+                    style={styles.creatorModalLink}
+                    onPress={() => void Linking.openURL(link.url)}
+                  >
+                    <Ionicons name="link-outline" size={16} color={PRIMARY} />
+                    <Text style={styles.creatorModalLinkText} numberOfLines={1}>
+                      {link.label || link.type}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* 인증 제출 모달 */}
       {showChallengeModal && <Modal visible transparent animationType="slide">
@@ -817,6 +912,64 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     lineHeight: 30,
   },
+  creatorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+    paddingVertical: 6,
+  },
+  creatorAvatar: { width: 34, height: 34, borderRadius: 17 },
+  creatorAvatarFallback: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFF1E8",
+  },
+  creatorAvatarText: { color: PRIMARY, fontSize: 14, fontWeight: "800" },
+  creatorText: { flex: 1, marginLeft: 10 },
+  creatorName: { color: INK1, fontSize: 14, fontWeight: "700" },
+  creatorModalBackdrop: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    backgroundColor: "rgba(0,0,0,0.46)",
+  },
+  creatorModalCard: {
+    width: "100%",
+    maxWidth: 360,
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 26,
+    borderRadius: 24,
+    backgroundColor: "#FFFFFF",
+  },
+  creatorModalClose: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  creatorModalAvatar: { width: 72, height: 72, borderRadius: 36 },
+  creatorModalAvatarText: { color: PRIMARY, fontSize: 24, fontWeight: "800" },
+  creatorModalLabel: { color: INK3, fontSize: 12, fontWeight: "700", marginTop: 14 },
+  creatorModalName: { color: INK1, fontSize: 21, fontWeight: "800", marginTop: 4 },
+  creatorModalDescription: { color: INK3, fontSize: 14, lineHeight: 21, textAlign: "center", marginTop: 12 },
+  creatorModalLoading: { marginTop: 14 },
+  creatorModalLinks: { width: "100%", gap: 8, marginTop: 18 },
+  creatorModalLink: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderRadius: 12,
+    backgroundColor: "#FFF1E8",
+  },
+  creatorModalLinkText: { color: PRIMARY, fontSize: 13, fontWeight: "700" },
   videoDesc: { fontSize: 14, color: INK3, lineHeight: 21 },
 
   progressCard: {

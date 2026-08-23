@@ -19,8 +19,17 @@ export interface Content {
   imageUrl: string | null;
   activeImageUrl: string | null;
   pointApplyable: boolean;
-  channel: { id: string; name: string } | null;
+  channel: { id: string; name: string; profileImageUrl?: string | null } | null;
   createdAt: string;
+}
+
+export interface Channel {
+  id: string;
+  name: string;
+  description: string | null;
+  profileImageUrl: string | null;
+  bannerImageUrl: string | null;
+  links: { type: string; url: string; label?: string | null }[];
 }
 
 export interface Challenge {
@@ -28,7 +37,7 @@ export interface Challenge {
   title: string | null;
   body: string | null;
   imageUrl: string | null;
-  author: { id: string; nickname: string };
+  author: { id: string; nickname: string; profileImageUrl?: string | null };
   content: { id: string; name: string } | null;
   createdAt: string;
 }
@@ -114,9 +123,36 @@ function normalizeMedia(raw: any): any[] {
     });
 }
 
+function normalizeContent(raw: any): Content {
+  return {
+    ...raw,
+    imageUrl: raw.imageUrl ? normalizeMediaUrl(raw.imageUrl) : null,
+    activeImageUrl: raw.activeImageUrl ? normalizeMediaUrl(raw.activeImageUrl) : null,
+    channel: raw.channel
+      ? {
+          ...raw.channel,
+          profileImageUrl: raw.channel.profileImageUrl
+            ? normalizeMediaUrl(raw.channel.profileImageUrl)
+            : null,
+        }
+      : null,
+  };
+}
+
+function normalizeAuthor(author: any) {
+  return {
+    ...author,
+    nickname: author?.nickname || "익명",
+    profileImageUrl: author?.profileImageUrl
+      ? normalizeMediaUrl(author.profileImageUrl)
+      : null,
+  };
+}
+
 function normalizePost(raw: any): Post {
   return {
     ...raw,
+    author: normalizeAuthor(raw.author),
     category: raw.category
       ? {
           ...raw.category,
@@ -125,7 +161,7 @@ function normalizePost(raw: any): Post {
       : null,
     commentCount: raw.commentCount ?? 0,
     viewCount: raw.viewCount,
-    likedByMe: raw.likedByMe ?? raw.isLiked ?? false,
+    likedByMe: raw.likedByMe ?? raw.isLiked ?? raw.liked ?? raw.hasLiked ?? false,
     media: normalizeMedia(raw),
   };
 }
@@ -133,9 +169,29 @@ function normalizePost(raw: any): Post {
 function normalizeComment(raw: any): Comment {
   return {
     ...raw,
+    author: normalizeAuthor(raw.author),
     boardId: raw.boardId ?? raw.board?.id ?? "",
-    likedByMe: raw.likedByMe ?? raw.isLiked ?? false,
+    likedByMe: raw.likedByMe ?? raw.isLiked ?? raw.liked ?? raw.hasLiked ?? false,
     children: (raw.children ?? []).map(normalizeComment),
+  };
+}
+
+function normalizeChallenge(raw: any): Challenge {
+  const author = raw.author;
+  const withdrawn =
+    !author ||
+    author.isDeleted ||
+    author.isWithdrawn ||
+    author.deletedAt ||
+    author.withdrawnAt ||
+    author.status === "deleted" ||
+    author.status === "withdrawn" ||
+    author.nickname?.startsWith("탈퇴");
+  return {
+    ...raw,
+    author: withdrawn
+      ? { id: author?.id ?? "withdrawn", nickname: "탈퇴한 회원", profileImageUrl: null }
+      : normalizeAuthor(author),
   };
 }
 
@@ -152,14 +208,25 @@ export const postsApi = {
     if (categoryId) params.categoryId = categoryId;
     const res = await apiClient.get("/api/boards", { params });
     const posts = unwrapList(res.data).map(normalizePost);
-    // ponytail: one request per post until the boards API returns total commentCount.
+    // ponytail: detail/comments requests are needed until the list API returns isLiked and total commentCount.
     return Promise.all(
       posts.map(async (post) => {
-        const comments = await apiClient
-          .get(`/api/boards/${post.id}/comments`)
-          .then((response) => unwrapList(response.data).map(normalizeComment))
-          .catch(() => []);
-        return { ...post, commentCount: countComments(comments) };
+        const [detail, comments] = await Promise.all([
+          apiClient
+            .get(`/api/boards/${post.id}`)
+            .then((response) => normalizePost(response.data?.data ?? response.data))
+            .catch(() => post),
+          apiClient
+            .get(`/api/boards/${post.id}/comments`)
+            .then((response) => unwrapList(response.data).map(normalizeComment))
+            .catch(() => []),
+        ]);
+        return {
+          ...post,
+          likeCount: detail.likeCount ?? post.likeCount,
+          likedByMe: detail.likedByMe,
+          commentCount: countComments(comments),
+        };
       }),
     );
   },
@@ -185,12 +252,14 @@ export const postsApi = {
 
   likePost: async (id: string): Promise<LikeResult> => {
     const res = await apiClient.post(`/api/boards/${id}/like`);
-    return res.data;
+    const data = res.data?.data ?? res.data;
+    return { ...data, isLiked: data?.isLiked ?? data?.likedByMe ?? data?.liked ?? true };
   },
 
   unlikePost: async (id: string): Promise<LikeResult> => {
     const res = await apiClient.delete(`/api/boards/${id}/like`);
-    return res.data;
+    const data = res.data?.data ?? res.data;
+    return { ...data, isLiked: data?.isLiked ?? data?.likedByMe ?? data?.liked ?? false };
   },
 
   reportPost: async ({ postId, ...payload }: { postId: string } & ReportPayload): Promise<void> => {
@@ -246,9 +315,27 @@ export const contentsApi = {
       apiClient.get("/api/contents/tutorials", { params: { interests: "knitting" } }),
       apiClient.get("/api/contents/tutorials", { params: { interests: "crochet" } }),
     ]);
-    const knittingData: Content[] = Array.isArray(knitting.data) ? knitting.data : [];
-    const crochetData: Content[] = Array.isArray(crochet.data) ? crochet.data : [];
-return [...knittingData, ...crochetData];
+    const knittingData = unwrapList(knitting.data).map(normalizeContent);
+    const crochetData = unwrapList(crochet.data).map(normalizeContent);
+    return [...knittingData, ...crochetData];
+  },
+  getById: async (id: string): Promise<Content> => {
+    const res = await apiClient.get(`/api/contents/${id}`);
+    return normalizeContent(res.data?.data ?? res.data);
+  },
+};
+
+export const channelsApi = {
+  getById: async (id: string): Promise<Channel> => {
+    const res = await apiClient.get(`/api/channels/${id}`);
+    const raw = res.data?.data ?? res.data;
+    return {
+      ...raw,
+      description: raw.description ?? null,
+      profileImageUrl: raw.profileImageUrl ? normalizeMediaUrl(raw.profileImageUrl) : null,
+      bannerImageUrl: raw.bannerImageUrl ? normalizeMediaUrl(raw.bannerImageUrl) : null,
+      links: Array.isArray(raw.links) ? raw.links : [],
+    };
   },
 };
 
@@ -261,11 +348,11 @@ export interface ChallengeSubmitResult {
 export const challengesApi = {
   getChallenges: async (): Promise<Challenge[]> => {
     const res = await apiClient.get("/api/challenges");
-    return Array.isArray(res.data) ? res.data : (res.data.data ?? []);
+    return unwrapList(res.data).map(normalizeChallenge);
   },
   getMyChallenges: async (): Promise<Challenge[]> => {
     const res = await apiClient.get("/api/challenges/my");
-    return Array.isArray(res.data) ? res.data : (res.data.data ?? []);
+    return unwrapList(res.data).map(normalizeChallenge);
   },
   submit: async (payload: {
     contentId: string;

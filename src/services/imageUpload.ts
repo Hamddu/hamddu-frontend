@@ -47,8 +47,6 @@ export async function pickImage(
     return ImagePicker.launchCameraAsync({
       mediaTypes: ["images"],
       quality: 1,
-      allowsEditing: true,
-      aspect: [4, 3],
     });
   }
 
@@ -59,8 +57,6 @@ export async function pickImage(
   return ImagePicker.launchImageLibraryAsync({
     mediaTypes: ["images"],
     quality: 1,
-    allowsEditing: true,
-    aspect: [4, 3],
   });
 }
 

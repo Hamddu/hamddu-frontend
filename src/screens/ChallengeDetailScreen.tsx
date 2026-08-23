@@ -9,6 +9,7 @@ import {
   View,
   RefreshControl,
   useWindowDimensions,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute } from "@react-navigation/native";
@@ -18,6 +19,7 @@ import { challengesApi } from "../services/api";
 import { CommunityStackParamList } from "../types/navigation";
 import ChallengeImagePlaceholder from "../components/ChallengeImagePlaceholder";
 import { getAvatarColors } from "../utils/avatarColors";
+import Ionicons from "@expo/vector-icons/Ionicons";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "https://api.hamddu.online";
 const PRIMARY = "#FF7325";
@@ -59,6 +61,7 @@ export default function ChallengeDetailScreen() {
   const { width } = useWindowDimensions();
   const { challengeId } = route.params;
   const [imageFailed, setImageFailed] = useState(false);
+  const [previewVisible, setPreviewVisible] = useState(false);
   const { data: challenges = [], isLoading, isError, isRefetching, refetch } = useQuery({
     queryKey: ["challenges"],
     queryFn: challengesApi.getChallenges,
@@ -95,7 +98,8 @@ export default function ChallengeDetailScreen() {
   }
 
   const imageUrl = normalizeImageUrl(challenge.imageUrl);
-  const authorName = challenge.author?.nickname ?? "익명";
+  const authorName = challenge.author?.nickname || "익명";
+  const authorImageUrl = normalizeImageUrl(challenge.author?.profileImageUrl);
   const avatarText = authorName.slice(0, 2);
   const avatarColors = getAvatarColors(challenge.author?.id ?? authorName);
   const body = stripHtml(challenge.body);
@@ -119,12 +123,20 @@ export default function ChallengeDetailScreen() {
       >
         <View style={styles.photoCard}>
           {imageUrl && !imageFailed ? (
-            <Image
-              source={{ uri: imageUrl }}
-              style={[styles.photo, { height: Math.min(width, 480) }]}
-              resizeMode="cover"
-              onError={() => setImageFailed(true)}
-            />
+            <TouchableOpacity
+              style={styles.photoPressable}
+              activeOpacity={0.9}
+              onPress={() => setPreviewVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel="인증 사진 크게 보기"
+            >
+              <Image
+                source={{ uri: imageUrl }}
+                style={[styles.photo, { height: Math.min(width, 480) }]}
+                resizeMode="cover"
+                onError={() => setImageFailed(true)}
+              />
+            </TouchableOpacity>
           ) : (
             <View style={[styles.photo, styles.photoEmpty, { height: Math.min(width, 480) }]}>
               <ChallengeImagePlaceholder />
@@ -135,19 +147,36 @@ export default function ChallengeDetailScreen() {
         <View style={styles.infoCard}>
           <View style={styles.authorRow}>
             <View style={[styles.avatar, { backgroundColor: avatarColors.backgroundColor }]}>
-              <Text style={[styles.avatarText, { color: avatarColors.color }]}>{avatarText}</Text>
+              {authorImageUrl ? (
+                <Image source={{ uri: authorImageUrl }} style={styles.avatarImage} />
+              ) : (
+                <Text style={[styles.avatarText, { color: avatarColors.color }]}>{avatarText}</Text>
+              )}
             </View>
             <View style={styles.authorInfo}>
               <Text style={styles.authorName} numberOfLines={1}>{authorName}</Text>
-              <Text style={styles.meta}>{getTimeAgo(challenge.createdAt)}</Text>
+              <Text style={styles.meta}>{tutorialLabel} · {getTimeAgo(challenge.createdAt)}</Text>
             </View>
           </View>
 
-          <Text style={styles.tutorialChip}>{tutorialLabel}</Text>
           <Text style={styles.title}>{title}</Text>
           {body ? <Text style={styles.body}>{body}</Text> : null}
         </View>
       </ScrollView>
+      <Modal
+        visible={previewVisible}
+        transparent
+        statusBarTranslucent
+        animationType="fade"
+        onRequestClose={() => setPreviewVisible(false)}
+      >
+        <View style={styles.imagePreviewBackdrop}>
+          <TouchableOpacity style={styles.imagePreviewClose} onPress={() => setPreviewVisible(false)}>
+            <Ionicons name="close" size={30} color="#fff" />
+          </TouchableOpacity>
+          {imageUrl ? <Image source={{ uri: imageUrl }} style={styles.imagePreview} resizeMode="contain" /> : null}
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -199,6 +228,7 @@ const styles = StyleSheet.create({
   photo: {
     width: "100%",
   },
+  photoPressable: { width: "100%" },
   photoEmpty: {
     alignItems: "center",
     justifyContent: "center",
@@ -228,6 +258,11 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: PRIMARY_DEEP,
   },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 20,
+  },
   authorInfo: {
     flex: 1,
     minWidth: 0,
@@ -243,17 +278,6 @@ const styles = StyleSheet.create({
     color: INK3,
     marginTop: 1,
   },
-  tutorialChip: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: PRIMARY_SOFT,
-    color: PRIMARY_DEEP,
-    fontSize: 11,
-    fontWeight: "800",
-    marginBottom: 14,
-  },
   title: {
     fontSize: 24,
     fontWeight: "800",
@@ -265,5 +289,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 26,
     color: INK2,
+  },
+  imagePreviewBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.94)",
+    justifyContent: "center",
+  },
+  imagePreview: {
+    width: "100%",
+    height: "100%",
+  },
+  imagePreviewClose: {
+    position: "absolute",
+    top: 54,
+    right: 18,
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1,
   },
 });

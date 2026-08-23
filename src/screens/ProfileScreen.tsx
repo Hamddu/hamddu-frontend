@@ -17,7 +17,8 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useAuthStore } from "../store/authStore";
 import { unregisterPushNotifications } from "../services/notifications";
 import { getMyProfile, updateProfile, deleteAccount } from "../api/users.api";
@@ -26,6 +27,18 @@ import ChallengeImagePlaceholder from "../components/ChallengeImagePlaceholder";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { getAvatarColors } from "../utils/avatarColors";
 import { pickAndUploadImage, ImageSource } from "../services/imageUpload";
+import type { Comment, Post, PostAuthor } from "../store/postStore";
+import type { ProfileStackParamList } from "../types/navigation";
+
+function updateCommentAuthors(comments: Comment[], author: PostAuthor): Comment[] {
+  return comments.map((comment) => ({
+    ...comment,
+    author: comment.author.id === author.id ? author : comment.author,
+    children: comment.children
+      ? updateCommentAuthors(comment.children, author)
+      : comment.children,
+  }));
+}
 
 function getTimeAgo(dateStr: string): string {
   const diffMs = Date.now() - new Date(dateStr).getTime();
@@ -47,11 +60,26 @@ function normalizeImageUrl(url?: string | null): string | null {
 
 const isValidNickname = (value: string) => /^[가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9\s]{2,30}$/.test(value.trim());
 
-function CertCard({ item, wide = false }: { item: Challenge; wide?: boolean }) {
+function CertCard({
+  item,
+  wide = false,
+  onPress,
+}: {
+  item: Challenge;
+  wide?: boolean;
+  onPress?: () => void;
+}) {
   const [imageFailed, setImageFailed] = useState(false);
   const imageUrl = normalizeImageUrl(item.imageUrl);
   return (
-    <View style={[styles.certCard, wide && styles.certCardWide]}>
+    <TouchableOpacity
+      style={[styles.certCard, wide && styles.certCardWide]}
+      onPress={onPress}
+      disabled={!onPress}
+      activeOpacity={0.78}
+      accessibilityRole={onPress ? "button" : undefined}
+      accessibilityLabel={onPress ? `${item.content?.name ?? item.title ?? "인증"} 상세 보기` : undefined}
+    >
       <View style={[styles.certThumb, wide && styles.certThumbWide]}>
         {imageUrl && !imageFailed ? (
           <Image
@@ -70,12 +98,13 @@ function CertCard({ item, wide = false }: { item: Challenge; wide?: boolean }) {
         </Text>
         <Text style={styles.certItemDate}>{getTimeAgo(item.createdAt)}</Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
 export default function ProfileScreen() {
   const logout = useAuthStore((s) => s.logout);
+  const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const [certModalVisible, setCertModalVisible] = useState(false);
@@ -159,11 +188,49 @@ export default function ProfileScreen() {
         Alert.alert("사용 중인 닉네임이에요", "다른 닉네임을 입력해주세요.");
         return;
       }
-      const updatedProfile = await updateProfile({
+      const profileResponse = await updateProfile({
         ...(nicknameChanged ? { nickname: value } : {}),
         ...(profileImageChanged ? { profileMediaId } : {}),
       });
+      const updatedProfile = {
+        ...profileResponse,
+        ...(profileImageChanged ? { profileImageUrl, profileMediaId } : {}),
+      };
       queryClient.setQueryData(["profile", "me"], updatedProfile);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["posts"] }),
+        queryClient.invalidateQueries({ queryKey: ["comments"] }),
+        queryClient.invalidateQueries({ queryKey: ["challenges"] }),
+      ]);
+      const updatedAuthor: PostAuthor = {
+        id: updatedProfile.id,
+        nickname: updatedProfile.nickname,
+        profileImageUrl: normalizeImageUrl(updatedProfile.profileImageUrl),
+      };
+      queryClient.setQueriesData<Post | Post[]>({ queryKey: ["posts"] }, (cached) => {
+        const updatePost = (post: Post) =>
+          post.author.id === updatedAuthor.id
+            ? { ...post, author: updatedAuthor }
+            : post;
+        return Array.isArray(cached) ? cached.map(updatePost) : cached ? updatePost(cached) : cached;
+      });
+      queryClient.setQueriesData<Comment[]>({ queryKey: ["comments"] }, (cached) =>
+        cached ? updateCommentAuthors(cached, updatedAuthor) : cached,
+      );
+      queryClient.setQueriesData<Challenge[]>({ queryKey: ["challenges"] }, (cached) =>
+        cached?.map((challenge) =>
+          challenge.author.id === updatedAuthor.id
+            ? {
+                ...challenge,
+                author: {
+                  ...challenge.author,
+                  nickname: updatedAuthor.nickname ?? "익명",
+                  profileImageUrl: updatedAuthor.profileImageUrl,
+                },
+              }
+            : challenge,
+        ),
+      );
       setNicknameModalVisible(false);
       Alert.alert("프로필을 변경했어요");
     } catch {
@@ -256,6 +323,13 @@ export default function ProfileScreen() {
       setIsRefreshing(false);
     }
   }, [refetchProfile, refetchXp, refetchPoints, refetchMyChallenges]);
+
+  const openChallengeDetail = (challengeId: string) => {
+    setCertModalVisible(false);
+    requestAnimationFrame(() => {
+      navigation.navigate("ChallengeDetail", { challengeId });
+    });
+  };
 
   if (profileLoading) {
     return (
@@ -510,7 +584,12 @@ export default function ProfileScreen() {
           </View>
           <ScrollView contentContainerStyle={styles.modalGrid}>
             {myChallenges.map((item) => (
-              <CertCard key={item.id} item={item} wide />
+              <CertCard
+                key={item.id}
+                item={item}
+                wide
+                onPress={() => openChallengeDetail(item.id)}
+              />
             ))}
           </ScrollView>
         </SafeAreaView>

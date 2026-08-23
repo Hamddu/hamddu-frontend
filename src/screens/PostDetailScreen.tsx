@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   ScrollView,
@@ -12,6 +12,7 @@ import {
   Image,
   useWindowDimensions,
   Alert,
+  Keyboard,
   Share,
   Modal,
 } from "react-native";
@@ -105,7 +106,15 @@ export default function PostDetailScreen() {
   const [reportReason, setReportReason] = useState<ReportReason>("spam");
   const [reportDescription, setReportDescription] = useState("");
   const [postMenuOpen, setPostMenuOpen] = useState(false);
+  const [previewImageIndex, setPreviewImageIndex] = useState<number | null>(null);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const totalCommentCount = comments ? countComments(comments) : (post?.commentCount ?? 0);
+
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener("keyboardDidHide", () => setKeyboardVisible(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   const reportMutation = useMutation({
     mutationFn: ({ target, reason, description }: { target: ReportTarget; reason: ReportReason; description?: string }) =>
@@ -135,6 +144,7 @@ export default function PostDetailScreen() {
         onSuccess: () => {
           setCommentText("");
           setReplyTo(null);
+          Keyboard.dismiss();
         },
         onError: (error) => {
           const message = axios.isAxiosError(error)
@@ -224,13 +234,21 @@ export default function PostDetailScreen() {
   }
 
   const categoryName = post.category?.name ?? "";
-  const authorName = post.author?.nickname ?? "익명";
   const isMine = !!myProfile?.id && post.author?.id === myProfile.id;
+  const displayAuthor = isMine
+    ? {
+        ...post.author,
+        nickname: myProfile.nickname ?? post.author?.nickname,
+        profileImageUrl: myProfile.profileImageUrl ?? post.author?.profileImageUrl,
+      }
+    : post.author;
+  const authorName = displayAuthor?.nickname || "익명";
   const avatarText = authorName.slice(0, 2);
-  const avatarColors = getAvatarColors(post.author?.id ?? authorName);
+  const avatarColors = getAvatarColors(displayAuthor?.id ?? authorName);
   const media = ((post as any).media ?? []).filter((item: any) => !post.body.includes(item.url ?? item));
   const tags = (post as any).tags ?? [];
   const authorMeta = [
+    categoryName || null,
     getTimeAgo(post.createdAt),
     typeof post.viewCount === "number" ? `조회 ${post.viewCount}` : null,
   ].filter(Boolean).join(" · ");
@@ -262,7 +280,11 @@ export default function PostDetailScreen() {
           <View style={styles.authorSection}>
             <View style={styles.authorLeft}>
               <View style={[styles.avatar, { backgroundColor: avatarColors.backgroundColor }]}>
-                <Text style={[styles.avatarText, { color: avatarColors.color }]}>{avatarText}</Text>
+                {displayAuthor?.profileImageUrl ? (
+                  <Image source={{ uri: displayAuthor.profileImageUrl }} style={styles.avatarImage} />
+                ) : (
+                  <Text style={[styles.avatarText, { color: avatarColors.color }]}>{avatarText}</Text>
+                )}
               </View>
               <View style={styles.authorInfo}>
                 <Text style={styles.authorName} numberOfLines={1}>{authorName}</Text>
@@ -272,9 +294,6 @@ export default function PostDetailScreen() {
           </View>
 
           <View style={styles.bodySection}>
-            {categoryName ? (
-              <Text style={styles.categoryChip}>{categoryName}</Text>
-            ) : null}
             <Text style={styles.postTitle}>{post.title}</Text>
             <RenderHtml
               contentWidth={contentWidth - 40}
@@ -298,12 +317,17 @@ export default function PostDetailScreen() {
               contentContainerStyle={styles.mediaContent}
             >
               {media.map((m: any, i: number) => (
-                <Image
+                <TouchableOpacity
                   key={m.url ?? i}
-                  source={{ uri: m.url ?? m }}
-                  style={[styles.mediaImage, { width: contentWidth - 40 }]}
-                  resizeMode="cover"
-                />
+                  activeOpacity={0.9}
+                  onPress={() => setPreviewImageIndex(i)}
+                >
+                  <Image
+                    source={{ uri: m.url ?? m }}
+                    style={[styles.mediaImage, { width: contentWidth - 40 }]}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
               ))}
             </ScrollView>
           )}
@@ -315,8 +339,8 @@ export default function PostDetailScreen() {
                 size={18}
                 color={post.likedByMe ? PRIMARY : INK3}
               />
-              <Text style={[styles.actionLabel, post.likedByMe && { color: PRIMARY }]}>좋아요</Text>
-              <Text style={styles.actionCount}>{post.likeCount}</Text>
+              <Text style={[styles.actionLabel, post.likedByMe && styles.actionActive]}>좋아요</Text>
+              <Text style={[styles.actionCount, post.likedByMe && styles.actionActive]}>{post.likeCount}</Text>
             </TouchableOpacity>
             <View style={styles.actionBtn}>
               <Ionicons name="chatbubble-outline" size={17} color={INK3} />
@@ -406,6 +430,11 @@ export default function PostDetailScreen() {
                 <CommentItem
                   comment={item}
                   currentUser={myProfile?.nickname ?? ""}
+                  currentAuthor={myProfile ? {
+                    id: myProfile.id,
+                    nickname: myProfile.nickname,
+                    profileImageUrl: myProfile.profileImageUrl,
+                  } : undefined}
                   onDelete={handleDeleteComment}
                   onLike={(comment) => toggleCommentLikeMutation.mutate({ postId, comment })}
                   onReply={(comment, parentId) =>
@@ -427,7 +456,7 @@ export default function PostDetailScreen() {
       </ScrollView>
 
       {/* 댓글 입력창 */}
-      <View style={[styles.commentInputContainer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+      <View style={[styles.commentInputContainer, { paddingBottom: keyboardVisible ? 6 : Math.max(insets.bottom, 10) }]}>
         {replyTo && (
           <View style={styles.replyTargetRow}>
             <Text style={styles.replyTargetText}>@{replyTo.nickname}님에게 답글</Text>
@@ -465,6 +494,48 @@ export default function PostDetailScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      <Modal
+        visible={previewImageIndex !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewImageIndex(null)}
+      >
+        <View style={styles.imagePreviewBackdrop}>
+          <TouchableOpacity
+            style={styles.imagePreviewClose}
+            onPress={() => setPreviewImageIndex(null)}
+            accessibilityLabel="이미지 닫기"
+          >
+            <Ionicons name="close" size={30} color="#fff" />
+          </TouchableOpacity>
+          {previewImageIndex !== null ? (
+            <FlatList
+              style={styles.imagePreviewList}
+              data={media}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              initialScrollIndex={previewImageIndex}
+              getItemLayout={(_, index) => ({ length: contentWidth, offset: contentWidth * index, index })}
+              keyExtractor={(item: any, index) => String(item.url ?? item ?? index)}
+              onMomentumScrollEnd={({ nativeEvent }) => {
+                setPreviewImageIndex(Math.round(nativeEvent.contentOffset.x / contentWidth));
+              }}
+              renderItem={({ item }: { item: any }) => (
+                <View style={[styles.imagePreviewPage, { width: contentWidth }]}>
+                  <Image source={{ uri: item.url ?? item }} style={styles.imagePreview} resizeMode="contain" />
+                </View>
+              )}
+            />
+          ) : null}
+          {previewImageIndex !== null && media.length > 1 ? (
+            <View style={styles.imagePreviewCount}>
+              <Text style={styles.imagePreviewCountText}>{previewImageIndex + 1} / {media.length}</Text>
+            </View>
+          ) : null}
+        </View>
+      </Modal>
 
       <Modal visible={!!reportTarget} transparent animationType="slide" onRequestClose={() => setReportTarget(null)}>
         <KeyboardAvoidingView
@@ -592,6 +663,11 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: PRIMARY_DEEP,
   },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 18,
+  },
   authorInfo: {
     marginLeft: 10,
     flex: 1,
@@ -612,17 +688,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 18,
     paddingBottom: 20,
-  },
-  categoryChip: {
-    alignSelf: "flex-start",
-    fontSize: 11,
-    fontWeight: "800",
-    color: PRIMARY_DEEP,
-    backgroundColor: PRIMARY_SOFT,
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    marginBottom: 14,
   },
   postTitle: {
     fontSize: 24,
@@ -653,9 +718,40 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   mediaImage: {
-    height: 260,
+    aspectRatio: 1,
     borderRadius: 16,
     backgroundColor: SURFACE,
+  },
+  imagePreviewBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.94)",
+    justifyContent: "center",
+  },
+  imagePreview: {
+    width: "100%",
+    height: "100%",
+  },
+  imagePreviewList: { flex: 1 },
+  imagePreviewPage: { height: "100%", alignItems: "center", justifyContent: "center" },
+  imagePreviewCount: {
+    position: "absolute",
+    top: 62,
+    alignSelf: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  imagePreviewCountText: { fontSize: 13, fontWeight: "700", color: "#FFFFFF" },
+  imagePreviewClose: {
+    position: "absolute",
+    top: 54,
+    right: 18,
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1,
   },
   actionBar: {
     flexDirection: "row",
@@ -684,6 +780,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: INK3,
   },
+  actionActive: { color: PRIMARY },
   moreButton: {
     width: 36,
     height: 36,

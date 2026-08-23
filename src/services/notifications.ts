@@ -33,7 +33,7 @@ export async function registerForPushNotifications(): Promise<() => void> {
   const stopTokenRefresh = onTokenRefresh(messaging, sendToken);
   const stopForegroundMessages = onMessage(messaging, (message) => {
     if (message.notification) {
-      Alert.alert(message.notification.title ?? "Handdu", message.notification.body);
+      Alert.alert(message.notification.title ?? "Hamddu", message.notification.body);
     }
   });
 

@@ -8,8 +8,6 @@
     "userInterfaceStyle": "light",
     "backgroundColor": "#FF7325",
     "splash": {
-      "image": "./assets/splash/yarn.png",
-      "resizeMode": "contain",
       "backgroundColor": "#FF7326"
     },
     "assetBundlePatterns": ["**/*"],
@@ -18,7 +16,7 @@
       "bundleIdentifier": "com.hamddu.app",
       "googleServicesFile": "./GoogleService-Info.plist",
       "entitlements": {
-        "aps-environment": "development"
+        "aps-environment": "$(APS_ENVIRONMENT)"
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -45,7 +43,12 @@
         }
       ],
       "expo-web-browser",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "enableBackgroundRemoteNotifications": true
+        }
+      ],
       [
         "@react-native-firebase/app",
         {

@@ -14,6 +14,7 @@ export const usePosts = (categoryId?: string) => {
   return useQuery({
     queryKey: postKeys.list(categoryId),
     queryFn: () => postsApi.getPosts(categoryId),
+    placeholderData: (previousData) => previousData,
   });
 };
 
@@ -105,11 +106,13 @@ export const useLikePost = () => {
     },
     onSuccess: (data, postId) => {
       queryClient.setQueryData<Post>(postKeys.detail(postId), (old) =>
-        old ? { ...old, likeCount: data.likeCount, likedByMe: data.isLiked } : old
+        old ? { ...old, likeCount: data.likeCount ?? old.likeCount, likedByMe: true } : old
       );
       queryClient.setQueriesData<Post[]>({ queryKey: postKeys.lists() }, (old) =>
         old?.map((p) =>
-          p.id === postId ? { ...p, likeCount: data.likeCount, likedByMe: data.isLiked } : p
+          p.id === postId
+            ? { ...p, likeCount: data.likeCount ?? p.likeCount, likedByMe: true }
+            : p
         )
       );
     },
@@ -157,11 +160,13 @@ export const useUnlikePost = () => {
     },
     onSuccess: (data, postId) => {
       queryClient.setQueryData<Post>(postKeys.detail(postId), (old) =>
-        old ? { ...old, likeCount: data.likeCount, likedByMe: data.isLiked } : old
+        old ? { ...old, likeCount: data.likeCount ?? old.likeCount, likedByMe: false } : old
       );
       queryClient.setQueriesData<Post[]>({ queryKey: postKeys.lists() }, (old) =>
         old?.map((p) =>
-          p.id === postId ? { ...p, likeCount: data.likeCount, likedByMe: data.isLiked } : p
+          p.id === postId
+            ? { ...p, likeCount: data.likeCount ?? p.likeCount, likedByMe: false }
+            : p
         )
       );
     },

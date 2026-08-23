@@ -140,14 +140,14 @@ export default function SurveyScreen() {
     : null;
 
   return (
-    <SafeAreaView style={styles.flex} edges={["top", "left", "right"]}>
+    <SafeAreaView style={styles.flex}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        {/* 진행바 1/2 */}
+        {/* 닉네임 + 취향 질문 4개 */}
         <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: "50%" }]} />
+          <View style={[styles.progressFill, { width: "20%" }]} />
         </View>
 
         <ScrollView
@@ -155,8 +155,9 @@ export default function SurveyScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.headline}>어떤 닉네임으로{"\n"}활동할까요?</Text>
-          <Text style={styles.sub}>마술봉으로 랜덤 추천을 받아볼 수 있어요.</Text>
+          <Text style={styles.stepText}>1 / 5</Text>
+          <Text style={styles.headline}>함뜨에서 어떤 이름으로{"\n"}활동할까요?</Text>
+          <Text style={styles.sub}>나중에 마이페이지에서도 바꿀 수 있어요.</Text>
 
           <View style={styles.avatarSection}>
             <View style={styles.avatarCircle}>
@@ -246,10 +247,11 @@ const styles = StyleSheet.create({
   progressFill: { height: 4, backgroundColor: PRIMARY, borderRadius: 2 },
 
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 24, paddingTop: 28 },
+  scrollContent: { paddingHorizontal: 24, paddingTop: 32 },
 
-  headline: { fontSize: 24, fontWeight: "700", color: INK, lineHeight: 33, letterSpacing: -0.5 },
-  sub: { fontSize: 15, color: HINT, lineHeight: 22, marginTop: 10 },
+  stepText: { fontSize: 13, fontWeight: "700", color: PRIMARY, marginBottom: 12 },
+  headline: { fontSize: 28, fontWeight: "800", color: INK, lineHeight: 38, letterSpacing: -0.7 },
+  sub: { fontSize: 16, fontWeight: "500", color: HINT, lineHeight: 24, marginTop: 10 },
 
   avatarSection: { alignItems: "center", marginTop: 36, marginBottom: 36 },
   avatarCircle: {

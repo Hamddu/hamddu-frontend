@@ -8,14 +8,15 @@ import {
   Image,
   Modal,
   Animated,
+  PanResponder,
   RefreshControl,
   useWindowDimensions,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import Svg, { Defs, Mask, Path, SvgUri, type SvgProps } from "react-native-svg";
+import Svg, { Defs, Mask, Path, type SvgProps } from "react-native-svg";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BackgroundHamdde from "../../assets/home/background-hamdde.svg";
 import Hat from "../../assets/home/hat.svg";
@@ -143,8 +144,6 @@ interface Lesson {
   state: LessonState;
   pct?: number;
   videoId?: string;
-  imageUrl?: string;
-  activeImageUrl?: string;
 }
 
 const KNITTING_ASSETS: TutorialNodeAsset[] = [
@@ -224,17 +223,18 @@ function contentToLesson(
     state,
     pct,
     videoId: content.sourceVideoId ?? undefined,
-    imageUrl: content.imageUrl ?? undefined,
-    activeImageUrl: content.activeImageUrl ?? undefined,
   };
 }
 
 export default function HomeScreen() {
   const navigation = useNavigation<NavigationProp>();
   const insets = useSafeAreaInsets();
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const [category, setCategory] = useState<Category>("knit");
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [isLessonModalVisible, setIsLessonModalVisible] = useState(false);
+  const modalDimOpacity = useRef(new Animated.Value(0)).current;
+  const modalSheetY = useRef(new Animated.Value(40)).current;
   const [heroStitch, setHeroStitch] = useState({
     dash: 5,
     gap: 8,
@@ -387,6 +387,95 @@ export default function HomeScreen() {
 
   const isUnlocked = (_index: number) => true;
 
+  const openLessonModal = (index: number) => {
+    modalDimOpacity.stopAnimation();
+    modalSheetY.stopAnimation();
+    modalDimOpacity.setValue(0);
+    modalSheetY.setValue(40);
+    setSelectedIndex(index);
+    setIsLessonModalVisible(true);
+    requestAnimationFrame(() => {
+      Animated.parallel([
+        Animated.timing(modalDimOpacity, {
+          toValue: 1,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+        Animated.spring(modalSheetY, {
+          toValue: 0,
+          damping: 24,
+          stiffness: 240,
+          mass: 0.9,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    });
+  };
+
+  const finishLessonModalClose = (translateY: number, duration = 180) => {
+    Animated.parallel([
+      Animated.timing(modalDimOpacity, {
+        toValue: 0,
+        duration,
+        useNativeDriver: true,
+      }),
+      Animated.timing(modalSheetY, {
+        toValue: translateY,
+        duration,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setIsLessonModalVisible(false);
+      setSelectedIndex(null);
+    });
+  };
+
+  const closeLessonModal = () => finishLessonModalClose(28);
+
+  const modalPanResponder = PanResponder.create({
+    onMoveShouldSetPanResponder: (_, gesture) =>
+      gesture.dy > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+    onPanResponderMove: (_, gesture) => {
+      const distance = Math.max(0, gesture.dy);
+      modalSheetY.setValue(distance);
+      modalDimOpacity.setValue(Math.max(0.25, 1 - distance / 360));
+    },
+    onPanResponderRelease: (_, gesture) => {
+      if (gesture.dy > 110 || gesture.vy > 0.9) {
+        finishLessonModalClose(windowHeight, 220);
+        return;
+      }
+      Animated.parallel([
+        Animated.spring(modalSheetY, {
+          toValue: 0,
+          damping: 24,
+          stiffness: 260,
+          useNativeDriver: true,
+        }),
+        Animated.timing(modalDimOpacity, {
+          toValue: 1,
+          duration: 160,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    },
+    onPanResponderTerminate: () => {
+      Animated.parallel([
+        Animated.spring(modalSheetY, {
+          toValue: 0,
+          damping: 24,
+          stiffness: 260,
+          useNativeDriver: true,
+        }),
+        Animated.timing(modalDimOpacity, {
+          toValue: 1,
+          duration: 160,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    },
+  });
+
   const goToLesson = (lesson: Lesson, index: number) => {
     if (!lesson.videoId || !isUnlocked(index)) return;
     setSelectedIndex(null);
@@ -401,18 +490,6 @@ export default function HomeScreen() {
       alreadyCertified: certifiedContentIds.has(lesson.contentId),
     });
   };
-
-  if (tutorialsLoading) {
-    return (
-      <SafeAreaView style={styles.loadingSafeArea}>
-        <ActivityIndicator
-          size="large"
-          color="#FFFFFF"
-          style={{ marginTop: 60 }}
-        />
-      </SafeAreaView>
-    );
-  }
 
   return (
     <View style={styles.root}>
@@ -551,7 +628,11 @@ export default function HomeScreen() {
           style={styles.mapScroll}
           contentContainerStyle={[
             styles.sheetContent,
-            { paddingBottom: insets.bottom + 96 },
+            {
+              minHeight:
+                windowHeight + HERO_COLLAPSE_DISTANCE - HERO_COLLAPSED_HEIGHT,
+              paddingBottom: insets.bottom + 96,
+            },
           ]}
           onScroll={Animated.event(
             [{ nativeEvent: { contentOffset: { y: mapScrollY } } }],
@@ -581,7 +662,12 @@ export default function HomeScreen() {
             <Text style={styles.sectionCount}>총 {lessons.length}강</Text>
           </View>
 
-          {lessons.length === 0 ? (
+          {tutorialsLoading ? (
+            <View style={styles.mapLoading}>
+              <ActivityIndicator color={PRIMARY} />
+              <Text style={styles.emptyText}>강의를 불러오는 중이에요</Text>
+            </View>
+          ) : lessons.length === 0 ? (
             <View style={styles.empty}>
               <Text style={styles.emptyText}>아직 등록된 강의가 없어요</Text>
             </View>
@@ -638,9 +724,6 @@ export default function HomeScreen() {
                   certifiedContentIds.has(lesson.contentId);
                 const NodeIcon = completed ? asset.ActiveIcon : asset.DisabledIcon;
                 const NodePop = completed ? asset.ActivePop : asset.DisabledPop;
-                const iconUrl = completed
-                  ? lesson.activeImageUrl ?? lesson.imageUrl
-                  : lesson.imageUrl;
                 const frameTop = Math.min(layout.iconY, layout.popY);
                 const frameWidth = Math.max(
                   NODE_ICON_SIZE,
@@ -667,29 +750,17 @@ export default function HomeScreen() {
                         height: frameHeight * mapScale,
                       },
                     ]}
-                    onPress={() => setSelectedIndex(index)}
+                    onPress={() => openLessonModal(index)}
                     activeOpacity={0.82}
                   >
-                    {iconUrl ? (
-                      <SvgUri
-                        uri={iconUrl}
-                        width={NODE_ICON_SIZE * mapScale}
-                        height={NODE_ICON_SIZE * mapScale}
-                        style={[
-                          styles.nodeIcon,
-                          { top: (layout.iconY - frameTop) * mapScale },
-                        ]}
-                      />
-                    ) : (
-                      <NodeIcon
-                        width={NODE_ICON_SIZE * mapScale}
-                        height={NODE_ICON_SIZE * mapScale}
-                        style={[
-                          styles.nodeIcon,
-                          { top: (layout.iconY - frameTop) * mapScale },
-                        ]}
-                      />
-                    )}
+                    <NodeIcon
+                      width={NODE_ICON_SIZE * mapScale}
+                      height={NODE_ICON_SIZE * mapScale}
+                      style={[
+                        styles.nodeIcon,
+                        { top: (layout.iconY - frameTop) * mapScale },
+                      ]}
+                    />
                     <NodePop
                       width={layout.popWidth * mapScale}
                       height={layout.popHeight * mapScale}
@@ -710,19 +781,32 @@ export default function HomeScreen() {
       </Animated.View>
 
       <Modal
-        visible={!!selectedLesson}
+        visible={isLessonModalVisible}
         transparent
-        animationType="slide"
-        onRequestClose={() => setSelectedIndex(null)}
+        animationType="none"
+        onRequestClose={closeLessonModal}
       >
         <View style={styles.modalOverlay}>
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.modalDim, { opacity: modalDimOpacity }]}
+          />
           <TouchableOpacity
             style={StyleSheet.absoluteFill}
-            onPress={() => setSelectedIndex(null)}
+            onPress={closeLessonModal}
             activeOpacity={1}
           />
           {selectedLesson && selectedIndex !== null && (
-            <View style={[styles.lessonModal, { paddingBottom: insets.bottom + 18 }]}>
+            <Animated.View
+              {...modalPanResponder.panHandlers}
+              style={[
+                styles.lessonModal,
+                {
+                  paddingBottom: insets.bottom + 18,
+                  transform: [{ translateY: modalSheetY }],
+                },
+              ]}
+            >
               <View style={styles.modalHandle} />
               <View style={styles.modalTopRow}>
                 <View style={styles.modalStatusChip}>
@@ -735,14 +819,6 @@ export default function HomeScreen() {
                     {selectedProgress === 100 ? "학습 완료" : selectedProgress > 0 ? "학습 중" : "새 강의"}
                   </Text>
                 </View>
-                <TouchableOpacity
-                  style={styles.modalCloseButton}
-                  onPress={() => setSelectedIndex(null)}
-                  accessibilityRole="button"
-                  accessibilityLabel="닫기"
-                >
-                  <Ionicons name="close" size={22} color={INK1} />
-                </TouchableOpacity>
               </View>
               <View style={styles.modalMedia}>
                 {selectedLesson.videoId ? (
@@ -807,7 +883,7 @@ export default function HomeScreen() {
                       : "시작하기"}
                 </Text>
               </TouchableOpacity>
-            </View>
+            </Animated.View>
           )}
         </View>
       </Modal>
@@ -823,7 +899,6 @@ const INK3 = "#8A8A8A";
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: CREAM },
-  loadingSafeArea: { flex: 1, backgroundColor: PRIMARY },
   hero: {
     backgroundColor: PRIMARY,
     overflow: "hidden",
@@ -936,7 +1011,7 @@ const styles = StyleSheet.create({
   segmentText: {
     color: INK1,
     opacity: 0.5,
-    fontSize: 19,
+    fontSize: 18,
     fontWeight: "800",
   },
   segmentTextActive: {
@@ -964,6 +1039,12 @@ const styles = StyleSheet.create({
   map: {
     minHeight: 700,
     position: "relative",
+  },
+  mapLoading: {
+    minHeight: 420,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
   },
   mapThread: {
     position: "absolute",
@@ -1001,6 +1082,9 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     justifyContent: "flex-end",
+  },
+  modalDim: {
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.35)",
   },
   lessonModal: {
@@ -1021,7 +1105,6 @@ const styles = StyleSheet.create({
     minHeight: 40,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     marginBottom: 12,
   },
   modalStatusChip: {
@@ -1037,14 +1120,6 @@ const styles = StyleSheet.create({
     color: PRIMARY,
     fontSize: 12,
     fontWeight: "800",
-  },
-  modalCloseButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#F2F4F6",
   },
   modalMedia: {
     position: "relative",

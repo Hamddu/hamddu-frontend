@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import LoginCharacter from "../../assets/login/character.svg";
 import LoginFire from "../../assets/login/fire.svg";
 import NaverIcon from "../../assets/login/naver.svg";
@@ -20,7 +21,6 @@ import YarnBottom from "../../assets/login/yarn-bottom.svg";
 import YarnLeft from "../../assets/login/yarn-left.svg";
 import YarnTop from "../../assets/login/yarn-top.svg";
 import { loginWithOAuth } from "../api/auth.api";
-import { getMyProfile } from "../api/users.api";
 import { PRIVACY_POLICY, TERMS_OF_SERVICE } from "../constants/legal";
 import { useAuthStore } from "../store/authStore";
 
@@ -37,16 +37,9 @@ export default function LoginScreen() {
     setLoading(provider);
     try {
       const { accessToken, refreshToken, surveyRequired } = await loginWithOAuth(provider);
-      setAccessToken(accessToken);
       if (refreshToken) setRefreshToken(refreshToken);
-      if (surveyRequired) {
-        // 온보딩 완료 지표는 surveyCompleted 하나뿐.
-        // (백엔드가 닉네임을 기본 배정해도 설문 미완료면 온보딩을 거쳐야 함)
-        const profile = await getMyProfile().catch(() => null);
-        setSurveyRequired(!profile?.surveyCompleted);
-      } else {
-        setSurveyRequired(false);
-      }
+      setSurveyRequired(surveyRequired);
+      setAccessToken(accessToken);
     } catch (e: any) {
       Alert.alert("로그인 실패", e.message ?? "다시 시도해주세요.");
     } finally {
@@ -145,12 +138,13 @@ export default function LoginScreen() {
               {legalDocument === "terms" ? "이용약관" : "개인정보처리방침"}
             </Text>
             <TouchableOpacity
+              style={styles.legalCloseButton}
               accessibilityRole="button"
               accessibilityLabel="문서 닫기"
               hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
               onPress={() => setLegalDocument(null)}
             >
-              <Text style={styles.legalClose}>닫기</Text>
+              <Ionicons name="close" size={26} color="#1A1A1A" />
             </TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={styles.legalContent}>
@@ -241,7 +235,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   legalTitle: { fontSize: 18, fontWeight: "800", color: "#1A1A1A" },
-  legalClose: { fontSize: 15, fontWeight: "700", color: "#FF7326" },
+  legalCloseButton: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   legalContent: { paddingHorizontal: 22, paddingTop: 22, paddingBottom: 48 },
   legalBody: { fontSize: 14, lineHeight: 23, color: "#404040" },
 });

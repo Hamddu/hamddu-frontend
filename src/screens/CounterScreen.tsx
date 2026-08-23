@@ -1,12 +1,14 @@
 import React, { useState, useCallback, useRef } from "react";
 import {
   Animated,
+  Easing,
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   FlatList,
   Modal,
+  PanResponder,
   TextInput,
   BackHandler,
   Alert,
@@ -14,9 +16,11 @@ import {
   Platform,
   RefreshControl,
   useWindowDimensions,
+  Keyboard,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useCounterStore, CounterProject, RowRecord } from "../store/counterStore";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import RowBadgeActive from "../../assets/counter/row-badge-active.svg";
@@ -32,13 +36,60 @@ function DrumDigit({ digit }: { digit: number }) {
 }
 
 function CounterHandle({ rotation, reverse = false }: { rotation: Animated.Value; reverse?: boolean }) {
-  const rotateX = rotation.interpolate({
+  const translateY = rotation.interpolate({
     inputRange: [0, 1],
-    outputRange: reverse ? ["0deg", "-360deg"] : ["0deg", "360deg"],
+    outputRange: reverse ? [0, -52] : [-52, 0],
   });
   return (
-    <Animated.View style={[styles.drumHandle, reverse && styles.drumHandleRight, { transform: [{ perspective: 600 }, { rotateX }] }]}>
-      {[0, 1, 2, 3, 4].map((ridge) => <View key={ridge} style={styles.handleRidge} />)}
+    <View style={[styles.drumHandle, reverse && styles.drumHandleRight]}>
+      <View style={styles.handleRidgeWindow}>
+        <Animated.View style={[styles.handleSpinner, { transform: [{ translateY }] }]}>
+          {Array.from({ length: 7 }, (_, ridge) => <View key={ridge} style={styles.handleRidge} />)}
+        </Animated.View>
+        <LinearGradient
+          pointerEvents="none"
+          colors={["#EFE6DF", "rgba(239,230,223,0)", "rgba(239,230,223,0)", "#EFE6DF"]}
+          locations={[0, 0.24, 0.76, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+      </View>
+    </View>
+  );
+}
+
+function SwipeToDelete({ children, disabled, onDelete }: { children: React.ReactNode; disabled: boolean; onDelete: () => void }) {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const disabledRef = useRef(disabled);
+  const onDeleteRef = useRef(onDelete);
+  disabledRef.current = disabled;
+  onDeleteRef.current = onDelete;
+
+  const panResponder = useRef(PanResponder.create({
+    onMoveShouldSetPanResponder: (_, gesture) =>
+      !disabledRef.current && Math.abs(gesture.dx) > 8 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
+    onPanResponderMove: (_, gesture) => translateX.setValue(gesture.dx),
+    onPanResponderRelease: (_, gesture) => {
+      if (Math.abs(gesture.dx) > 90) {
+        Animated.timing(translateX, {
+          toValue: gesture.dx < 0 ? -500 : 500,
+          duration: 180,
+          useNativeDriver: true,
+        }).start(() => {
+          translateX.setValue(0);
+          onDeleteRef.current();
+        });
+      } else {
+        Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+      }
+    },
+    onPanResponderTerminate: () => {
+      Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+    },
+  })).current;
+
+  return (
+    <Animated.View {...panResponder.panHandlers} style={{ transform: [{ translateX }] }}>
+      {children}
     </Animated.View>
   );
 }
@@ -60,7 +111,8 @@ function CounterDetail({
   const [saveModal, setSaveModal] = useState(false);
   const [projectName, setProjectName] = useState(project.name);
   const [editingName, setEditingName] = useState(false);
-  const handleRotation = useRef(new Animated.Value(0)).current;
+  const leftHandleRotation = useRef(new Animated.Value(0)).current;
+  const rightHandleRotation = useRef(new Animated.Value(0)).current;
   const { width } = useWindowDimensions();
   const targetRow = project.targetRow ?? 0;
   const drumWidth = Math.min(width - 44, 331);
@@ -98,16 +150,62 @@ function CounterDetail({
     setStitch(0);
   };
 
+  const handleSelectRow = (selected: RowRecord) => {
+    if (selected.row === row) return;
+    setRowRecords((current) => [
+      ...current.filter((record) => record.row !== row),
+      { row, stitches: stitch },
+    ].sort((a, b) => a.row - b.row));
+    setRow(selected.row);
+    setStitch(selected.stitches);
+  };
+
+  const handleDeleteRow = (rowToDelete: number) => {
+    const ordered = [...displayRecords].sort((a, b) => a.row - b.row);
+    const deletedIndex = ordered.findIndex((record) => record.row === rowToDelete);
+    const remaining = ordered.filter((record) => record.row !== rowToDelete);
+
+    if (remaining.length === 0) {
+      setRowRecords([]);
+      setRow(1);
+      setStitch(0);
+      return;
+    }
+
+    const currentIndex = row === rowToDelete
+      ? Math.min(deletedIndex, remaining.length - 1)
+      : remaining.findIndex((record) => record.row === row);
+    const renumbered = remaining.map((record, index) => ({ ...record, row: index + 1 }));
+    const selected = renumbered[Math.max(0, currentIndex)];
+
+    setRowRecords(renumbered);
+    setRow(selected.row);
+    setStitch(selected.stitches);
+  };
+
   const handlePlusOne = () => {
     setStitch((current) => current + 1);
-    handleRotation.stopAnimation(() => {
-      handleRotation.setValue(0);
-      Animated.timing(handleRotation, {
-        toValue: 1,
-        duration: 320,
-        useNativeDriver: true,
-      }).start();
-    });
+    rightHandleRotation.stopAnimation();
+    rightHandleRotation.setValue(0);
+    Animated.timing(rightHandleRotation, {
+      toValue: 1,
+      duration: 480,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleMinusOne = () => {
+    if (stitch === 0) return;
+    setStitch(stitch - 1);
+    leftHandleRotation.stopAnimation();
+    leftHandleRotation.setValue(0);
+    Animated.timing(leftHandleRotation, {
+      toValue: 1,
+      duration: 480,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
   };
 
   const handleSave = () => {
@@ -134,10 +232,7 @@ function CounterDetail({
     onClose();
   };
 
-  const displayRecords = [...rowRecords];
-  if (!displayRecords.find((r) => r.row === row)) {
-    displayRecords.push({ row, stitches: stitch });
-  }
+  const displayRecords = [...rowRecords.filter((record) => record.row !== row), { row, stitches: stitch }];
   const sortedRecords = displayRecords.sort((a, b) => b.row - a.row);
 
   return (
@@ -153,6 +248,31 @@ function CounterDetail({
         >
           <Ionicons name="chevron-back" size={24} color={INK1} />
         </TouchableOpacity>
+        <View style={styles.detailHeaderTitleSlot}>
+          {editingName ? (
+            <TextInput
+              style={styles.detailTitleInput}
+              value={projectName}
+              onChangeText={setProjectName}
+              onBlur={() => setEditingName(false)}
+              onSubmitEditing={() => setEditingName(false)}
+              autoFocus
+              selectTextOnFocus
+              returnKeyType="done"
+            />
+          ) : (
+            <TouchableOpacity
+              onPress={() => setEditingName(true)}
+              activeOpacity={0.7}
+              style={styles.detailTitleBtn}
+              accessibilityRole="button"
+              accessibilityLabel="프로젝트 이름 수정"
+            >
+              <Text style={styles.detailTitle} numberOfLines={1}>{projectName}</Text>
+              <Ionicons name="pencil-outline" size={15} color={INK3} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <FlatList
@@ -163,46 +283,24 @@ function CounterDetail({
         ListHeaderComponent={
           <>
             <View style={styles.counterHero}>
-              {editingName ? (
-                <TextInput
-                  style={styles.detailTitleInput}
-                  value={projectName}
-                  onChangeText={setProjectName}
-                  onBlur={() => setEditingName(false)}
-                  onSubmitEditing={() => setEditingName(false)}
-                  autoFocus
-                  selectTextOnFocus
-                  returnKeyType="done"
-                />
-              ) : (
-                <TouchableOpacity
-                  onPress={() => setEditingName(true)}
-                  activeOpacity={0.7}
-                  style={styles.detailTitleBtn}
-                  accessibilityRole="button"
-                  accessibilityLabel="프로젝트 이름 수정"
-                >
-                  <Text style={styles.detailTitle}>{projectName}</Text>
-                  <Ionicons name="pencil-outline" size={15} color={INK3} />
-                </TouchableOpacity>
-              )}
               <View style={styles.drumWrapper}>
                 <View style={[styles.drum, { width: drumWidth }]}>
-                  <CounterHandle rotation={handleRotation} />
+                  <CounterHandle rotation={leftHandleRotation} />
                   <View style={styles.drumCenter}>
+                    <Text style={styles.drumRowLabel}>{row}단</Text>
                     <View style={[styles.drumScreen, { gap: digitGap }]}>
                       <DrumDigit digit={tens} />
                       <DrumDigit digit={ones} />
                     </View>
                   </View>
-                  <CounterHandle rotation={handleRotation} reverse />
+                  <CounterHandle rotation={rightHandleRotation} reverse />
                 </View>
               </View>
 
               <View style={styles.counterBtns}>
                 <TouchableOpacity
                   style={styles.minusBtn}
-                  onPress={() => setStitch(Math.max(0, stitch - 1))}
+                  onPress={handleMinusOne}
                   activeOpacity={0.75}
                   accessibilityRole="button"
                   accessibilityLabel="한 코 빼기"
@@ -234,35 +332,52 @@ function CounterDetail({
               <Text style={styles.logTitle}>단별 기록</Text>
               <Text style={styles.logCount}>{sortedRecords.length}단 저장됨</Text>
             </View>
+            <TouchableOpacity
+              style={styles.addRowButton}
+              onPress={() => handleNextRow()}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="단 추가하기"
+            >
+              <Ionicons name="add-circle-outline" size={18} color="#D9C7BB" />
+              <Text style={styles.addRowButtonText}>단 추가하기</Text>
+            </TouchableOpacity>
           </>
         }
         renderItem={({ item }) => {
           const isCurrent = item.row === row;
           const Badge = isCurrent ? RowBadgeActive : RowBadgeDisabled;
           return (
-            <View style={[styles.logRow, isCurrent && styles.logRowActive]}>
-              <View style={styles.logBadge}>
-                <Badge width={54} height={56} />
-                <Text style={[styles.logBadgeText, isCurrent && styles.logBadgeTextActive]}>
-                  {item.row}단
-                </Text>
-              </View>
-              <Text style={styles.logStitch}>{item.stitches}코</Text>
-              {isCurrent && (
-                <View style={styles.progressTag}>
-                  <Text style={styles.progressTagText}>진행중</Text>
+            <SwipeToDelete disabled={item.row === 1} onDelete={() => handleDeleteRow(item.row)}>
+              <TouchableOpacity
+                style={[styles.logRow, isCurrent && styles.logRowActive]}
+                onPress={() => handleSelectRow(item)}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel={`${item.row}단 ${item.stitches}코 선택`}
+                accessibilityHint={item.row === 1 ? "첫 단은 삭제할 수 없습니다" : "옆으로 밀면 삭제됩니다"}
+                accessibilityActions={item.row === 1 ? [] : [{ name: "delete", label: "단 삭제" }]}
+                onAccessibilityAction={({ nativeEvent }) => {
+                  if (item.row !== 1 && nativeEvent.actionName === "delete") handleDeleteRow(item.row);
+                }}
+              >
+                <View style={styles.logBadge}>
+                  <Badge width={54} height={56} />
+                  <Text style={[styles.logBadgeText, isCurrent && styles.logBadgeTextActive]}>
+                    {item.row}단
+                  </Text>
                 </View>
-              )}
-            </View>
+                <Text style={styles.logStitch}>{item.stitches}코</Text>
+                {isCurrent && (
+                  <View style={styles.progressTag}>
+                    <Text style={styles.progressTagText}>진행중</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </SwipeToDelete>
           );
         }}
         ItemSeparatorComponent={() => <View style={styles.logDivider} />}
-        ListFooterComponent={
-          <TouchableOpacity style={styles.nextRowFooter} onPress={() => handleNextRow()} activeOpacity={0.75}>
-            <Text style={styles.nextRowFooterText}>다음 단으로</Text>
-            <Ionicons name="arrow-forward" size={16} color={PRIMARY} />
-          </TouchableOpacity>
-        }
       />
 
       {/* 저장 모달 */}
@@ -348,6 +463,7 @@ export default function CounterScreen() {
         day: "2-digit",
       }),
     };
+    Keyboard.dismiss();
     setNewModal(false);
     setSelected(newProject);
   };
@@ -473,10 +589,12 @@ export default function CounterScreen() {
               placeholder="예: 12"
               placeholderTextColor="#AAAAAA"
               keyboardType="number-pad"
-              returnKeyType="done"
             />
             <View style={styles.modalBtns}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setNewModal(false)}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => {
+                Keyboard.dismiss();
+                setNewModal(false);
+              }}>
                 <Text style={styles.cancelBtnText}>취소</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.saveBtn} onPress={handleCreateProject} activeOpacity={0.85}>
@@ -577,9 +695,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF8F2",
   },
   backBtn: { width: 56, height: 44, alignItems: "flex-start", justifyContent: "center" },
-  detailTitleBtn: { alignSelf: "center", minHeight: 42, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, marginBottom: 18, paddingHorizontal: 20 },
+  detailHeaderTitleSlot: { position: "absolute", left: 72, right: 72, height: 58, alignItems: "center", justifyContent: "center" },
+  detailTitleBtn: { maxWidth: "100%", minHeight: 42, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingHorizontal: 10 },
   detailTitle: { fontSize: 19, fontWeight: "800", color: INK1 },
-  detailTitleInput: { height: 42, marginHorizontal: 26, marginBottom: 18, fontSize: 19, fontWeight: "800", color: INK1, textAlign: "center", borderBottomWidth: 1.5, borderBottomColor: PRIMARY, paddingVertical: 2 },
+  detailTitleInput: { width: "100%", height: 42, fontSize: 19, fontWeight: "800", color: INK1, textAlign: "center", borderBottomWidth: 1.5, borderBottomColor: PRIMARY, paddingVertical: 2 },
   detailList: { flex: 1, backgroundColor: "#FFFFFF" },
   detailContent: { paddingBottom: 130 },
   counterHero: { paddingTop: 31, paddingBottom: 38, backgroundColor: "#FFF8F2" },
@@ -599,7 +718,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#EFE6DF",
     alignItems: "center",
     justifyContent: "center",
-    gap: 16,
+    overflow: "hidden",
   },
   drumHandleRight: {
     borderTopLeftRadius: 4,
@@ -607,6 +726,8 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 30,
     borderBottomRightRadius: 30,
   },
+  handleRidgeWindow: { height: 114, overflow: "hidden" },
+  handleSpinner: { alignItems: "center", gap: 16 },
   handleRidge: { width: 26, height: 10, borderRadius: 4, backgroundColor: "#C4BDB8" },
   drumCenter: {
     flex: 1,
@@ -616,6 +737,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  drumRowLabel: { position: "absolute", top: 14, fontSize: 13, fontWeight: "700", color: "rgba(255,255,255,0.9)" },
   drumScreen: {
     flexDirection: "row",
   },
@@ -649,6 +771,20 @@ const styles = StyleSheet.create({
   },
   logTitle: { fontSize: 15, fontWeight: "600", color: INK1 },
   logCount: { fontSize: 13, fontWeight: "500", color: "rgba(26,26,26,0.5)" },
+  addRowButton: {
+    height: 72,
+    marginHorizontal: 23,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderStyle: "dashed",
+    borderColor: "#EFE6DF",
+    borderRadius: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+  },
+  addRowButtonText: { fontSize: 15, fontWeight: "500", color: "#85807D", letterSpacing: -0.3 },
   logRow: {
     height: 72,
     flexDirection: "row",
@@ -672,19 +808,6 @@ const styles = StyleSheet.create({
   logStitch: { flex: 1, fontSize: 15, fontWeight: "500", color: INK1 },
   progressTag: { backgroundColor: "#FFFFFF", paddingHorizontal: 16, paddingVertical: 6, borderRadius: 30 },
   progressTagText: { fontSize: 15, fontWeight: "500", color: INK1 },
-  nextRowFooter: {
-    height: 48,
-    marginHorizontal: 23,
-    marginTop: 14,
-    borderRadius: 24,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    backgroundColor: "#F7F8FA",
-  },
-  nextRowFooterText: { fontSize: 14, fontWeight: "700", color: PRIMARY },
-
   // 목표 코수
   targetRow: { marginHorizontal: 26, marginTop: 16, gap: 6 },
   targetBar: { height: 6, backgroundColor: LINE, borderRadius: 3, overflow: "hidden" },

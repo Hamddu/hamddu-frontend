@@ -8,6 +8,29 @@ export const apiClient = axios.create({
   withCredentials: true,
 });
 
+let refreshRequest: Promise<string> | null = null;
+
+function refreshAccessToken(): Promise<string> {
+  if (refreshRequest) return refreshRequest;
+
+  const refreshToken = useAuthStore.getState().refreshToken;
+  if (!refreshToken) return Promise.reject(new Error('No refresh token'));
+
+  refreshRequest = axios
+    .post(`${API_BASE_URL}/api/auth/refresh`, { refreshToken }, { withCredentials: true })
+    .then(({ data }) => {
+      if (typeof data.accessToken !== 'string') throw new Error('Invalid refresh response');
+      useAuthStore.getState().setAccessToken(data.accessToken);
+      if (data.refreshToken) useAuthStore.getState().setRefreshToken(data.refreshToken);
+      return data.accessToken;
+    })
+    .finally(() => {
+      refreshRequest = null;
+    });
+
+  return refreshRequest;
+}
+
 apiClient.interceptors.request.use((config) => {
   const token = useAuthStore.getState().accessToken;
   if (token) {
@@ -20,22 +43,17 @@ apiClient.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config;
-    if (error.response?.status === 401 && !original._retry) {
+    if (error.response?.status === 401 && original && !original._retry) {
       original._retry = true;
+
+      const currentToken = useAuthStore.getState().accessToken;
+      if (currentToken && original.headers?.Authorization !== `Bearer ${currentToken}`) {
+        original.headers.Authorization = `Bearer ${currentToken}`;
+        return apiClient(original);
+      }
+
       try {
-        // 웹은 쿠키, 모바일은 저장해둔 refresh 토큰을 body로 전달
-        const refreshToken = useAuthStore.getState().refreshToken;
-        const res = await axios.post(
-          `${API_BASE_URL}/api/auth/refresh`,
-          { refreshToken },
-          { withCredentials: true },
-        );
-        const newToken = res.data.accessToken;
-        useAuthStore.getState().setAccessToken(newToken);
-        // 서버가 회전한 새 refresh 토큰을 내려주면 저장 (재사용 감지 회피)
-        if (res.data.refreshToken) {
-          useAuthStore.getState().setRefreshToken(res.data.refreshToken);
-        }
+        const newToken = await refreshAccessToken();
         original.headers.Authorization = `Bearer ${newToken}`;
         return apiClient(original);
       } catch {

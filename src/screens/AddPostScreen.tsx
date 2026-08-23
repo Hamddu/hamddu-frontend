@@ -25,7 +25,7 @@ import { pickAndUploadImage } from '../services/imageUpload';
 import type { ImageSource } from '../services/imageUpload';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
-const TITLE_MAX = 200;
+const TITLE_MAX = 30;
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();

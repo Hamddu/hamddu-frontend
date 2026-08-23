@@ -3,6 +3,7 @@ import { create } from "zustand";
 export interface PostAuthor {
   id: string;
   nickname: string | null;
+  profileImageUrl?: string | null;
 }
 
 export interface PostCategory {

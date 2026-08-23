@@ -1,9 +1,9 @@
 import React, { useState } from "react";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Image } from "react-native";
 import { Text } from "react-native-paper";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { getAvatarColors } from "../utils/avatarColors";
-import { Comment } from "../store/postStore";
+import { Comment, PostAuthor } from "../store/postStore";
 
 const INK1 = "#1A1A1A";
 const INK2 = "#404040";
@@ -15,6 +15,7 @@ const LINE = "#ECECEC";
 interface CommentItemProps {
   comment: Comment;
   currentUser?: string;
+  currentAuthor?: PostAuthor;
   onDelete?: (commentId: string) => void;
   onLike?: (comment: Comment) => void;
   onReply?: (comment: Comment, parentId: string) => void;
@@ -39,6 +40,7 @@ function getTimeAgo(dateStr: string): string {
 export default function CommentItem({
   comment,
   currentUser = "",
+  currentAuthor,
   onDelete,
   onLike,
   onReply,
@@ -46,9 +48,14 @@ export default function CommentItem({
   depth = 0,
   rootCommentId = comment.id,
 }: CommentItemProps) {
-  const authorName = comment.author?.nickname ?? "익명";
-  const avatarColors = getAvatarColors(comment.author?.id ?? authorName);
-  const isOwner = authorName === currentUser;
+  const isOwner = currentAuthor?.id
+    ? comment.author?.id === currentAuthor.id
+    : comment.author?.nickname === currentUser;
+  const displayAuthor = isOwner && currentAuthor
+    ? { ...comment.author, ...currentAuthor }
+    : comment.author;
+  const authorName = displayAuthor?.nickname || "익명";
+  const avatarColors = getAvatarColors(displayAuthor?.id ?? authorName);
   const timeAgo = getTimeAgo(comment.createdAt);
   const [showReplies, setShowReplies] = useState(depth === 0);
   const children = comment.children ?? [];
@@ -58,9 +65,13 @@ export default function CommentItem({
     <View style={[styles.container, depth > 0 && { paddingLeft: 44 }]}>
       {/* 아바타 */}
       <View style={[styles.avatar, depth > 0 && styles.childAvatar, { backgroundColor: avatarColors.backgroundColor }]}>
-        <Text style={[styles.avatarText, depth > 0 && styles.childAvatarText, { color: avatarColors.color }]}>
-          {authorName.slice(0, 2)}
-        </Text>
+        {displayAuthor?.profileImageUrl ? (
+          <Image source={{ uri: displayAuthor.profileImageUrl }} style={styles.avatarImage} />
+        ) : (
+          <Text style={[styles.avatarText, depth > 0 && styles.childAvatarText, { color: avatarColors.color }]}>
+            {authorName.slice(0, 2)}
+          </Text>
+        )}
       </View>
 
       <View style={styles.content}>
@@ -85,7 +96,9 @@ export default function CommentItem({
               size={15}
               color={comment.likedByMe ? PRIMARY : INK3}
             />
-            <Text style={styles.likeCount}>{comment.likeCount}</Text>
+            <Text style={[styles.likeCount, comment.likedByMe && { color: PRIMARY }]}>
+              {comment.likeCount}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => onReply?.(comment, rootCommentId)}>
             <Text style={styles.replyText}>답글 달기</Text>
@@ -112,6 +125,7 @@ export default function CommentItem({
             key={child.id}
             comment={child}
             currentUser={currentUser}
+            currentAuthor={currentAuthor}
             onDelete={onDelete}
             onLike={onLike}
             onReply={onReply}
@@ -143,6 +157,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
     color: PRIMARY,
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 16,
   },
   childAvatar: {
     width: 24,

@@ -39,6 +39,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 const Tab = createBottomTabNavigator();
 const HomeStack = createNativeStackNavigator();
 const CommunityStack = createNativeStackNavigator();
+const ProfileStack = createNativeStackNavigator();
 const SurveyStack = createNativeStackNavigator();
 const RootStack = createNativeStackNavigator();
 
@@ -168,6 +169,27 @@ function CommunityStackNavigator() {
   );
 }
 
+function ProfileStackNavigator() {
+  return (
+    <ProfileStack.Navigator
+      screenOptions={({ navigation }) => ({
+        header: () => <CommunityHeader onBack={navigation.goBack} />,
+        contentStyle: { backgroundColor: WHITE },
+      })}
+    >
+      <ProfileStack.Screen
+        name="MyProfile"
+        component={ProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <ProfileStack.Screen
+        name="ChallengeDetail"
+        component={ChallengeDetailScreen}
+      />
+    </ProfileStack.Navigator>
+  );
+}
+
 function FloatingTabBackground() {
   return (
     <View style={{ flex: 1, borderRadius: 38, overflow: "hidden" }}>
@@ -202,7 +224,8 @@ function MainTabs() {
         const nestedRoute = getFocusedRouteNameFromRoute(route);
         const hideTabBar =
           (route.name === "Home" && nestedRoute === "TutorialVideo") ||
-          (route.name === "Community" && !!nestedRoute && nestedRoute !== "CommunityFeed");
+          (route.name === "Community" && !!nestedRoute && nestedRoute !== "CommunityFeed") ||
+          (route.name === "MyPage" && !!nestedRoute && nestedRoute !== "MyProfile");
 
         return {
         lazy: false,
@@ -296,7 +319,7 @@ function MainTabs() {
       />
       <Tab.Screen
         name="MyPage"
-        component={ProfileScreen}
+        component={ProfileStackNavigator}
         options={{
           tabBarLabel: "마이",
           headerShown: false,
@@ -354,6 +377,7 @@ function SurveyStackNavigator() {
 
 function RootNavigator() {
   const [hydrated, setHydrated] = useState(useAuthStore.persist.hasHydrated());
+  const [splashDone, setSplashDone] = useState(false);
   const accessToken = useAuthStore((s) => s.accessToken);
   const surveyRequired = useAuthStore((s) => s.surveyRequired);
 
@@ -363,7 +387,13 @@ function RootNavigator() {
     return unsubscribe;
   }, []);
 
-  if (!hydrated) return <SplashScreen />;
+  useEffect(() => {
+    if (!hydrated) return;
+    const splashTimer = setTimeout(() => setSplashDone(true), 3000);
+    return () => clearTimeout(splashTimer);
+  }, [hydrated]);
+
+  if (!hydrated || !splashDone) return <SplashScreen />;
 
   return (
     <RootStack.Navigator screenOptions={{ headerShown: false }}>

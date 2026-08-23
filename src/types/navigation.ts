@@ -1,8 +1,10 @@
+import type { NavigatorScreenParams } from "@react-navigation/native";
+
 export type RootTabParamList = {
   Home: undefined;
   Counter: undefined;
-  Community: undefined;
-  MyPage: undefined;
+  Community: NavigatorScreenParams<CommunityStackParamList> | undefined;
+  MyPage: NavigatorScreenParams<ProfileStackParamList> | undefined;
 };
 
 export type HomeStackParamList = {
@@ -32,6 +34,7 @@ export type CounterStackParamList = {
 
 export type ProfileStackParamList = {
   MyProfile: undefined;
+  ChallengeDetail: { challengeId: string };
 };
 
 export type SurveyStackParamList = {

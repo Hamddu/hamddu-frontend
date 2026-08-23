@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
+  SectionList,
   ActivityIndicator,
   ScrollView,
   Image,
@@ -124,18 +125,31 @@ function PostListItem({
         <Text style={styles.postMeta} numberOfLines={1}>{meta}</Text>
         <Text style={styles.postBody} numberOfLines={2}>{stripHtml(post.body)}</Text>
         <View style={styles.postFooterActions}>
-          <TouchableOpacity style={styles.postAction} onPress={onLike} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.postAction}
+            onPress={(event) => {
+              event.stopPropagation();
+              onLike();
+            }}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityState={{ selected: post.likedByMe }}
+          >
             <Ionicons
               name={post.likedByMe ? "heart" : "heart-outline"}
               size={17}
               color={post.likedByMe ? PRIMARY : INK3}
             />
-            <Text style={[styles.postActionText, post.likedByMe && { color: PRIMARY }]}>{post.likeCount}</Text>
+            <Text style={[styles.postActionText, post.likedByMe && styles.postActionLiked]}>
+              {post.likeCount}
+            </Text>
           </TouchableOpacity>
-          <View style={styles.postAction}>
-            <Ionicons name="chatbubble-outline" size={16} color={INK3} />
-            <Text style={styles.postActionText}>{post.commentCount}</Text>
-          </View>
+          {(post.commentCount ?? 0) > 0 ? (
+            <View style={styles.postAction}>
+              <Ionicons name="chatbubble-outline" size={16} color={INK3} />
+              <Text style={styles.postActionText}>{post.commentCount}</Text>
+            </View>
+          ) : null}
         </View>
       </View>
     </TouchableOpacity>
@@ -173,47 +187,66 @@ export default function CommunityScreen() {
   const categoryTabs = [{ id: "all", label: "전체" }, ...categories];
   const { width } = useWindowDimensions();
   const certTileSize = Math.floor((width - 40 - 16) / 3);
+  const communityTabs = (
+    <View style={styles.tabRow}>
+      {(["post", "cert"] as Tab[]).map((t) => (
+        <TouchableOpacity
+          key={t}
+          style={[styles.tabBtn, tab === t && styles.tabBtnActive]}
+          onPress={() => setTab(t)}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.tabBtnText, tab === t && styles.tabBtnTextActive]}>
+            {t === "post" ? "일반 게시글" : "인증 게시글"}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+  const categoryBar = (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.catBar}
+      contentContainerStyle={styles.catContent}
+    >
+      {categoryTabs.map((c) => (
+        <TouchableOpacity
+          key={c.id}
+          style={[styles.catChip, cat === c.id && styles.catChipActive]}
+          onPress={() => setCat(c.id)}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.catChipText, cat === c.id && styles.catChipTextActive]}>
+            {c.label}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.tabRow}>
-        {(["post", "cert"] as Tab[]).map((t) => (
-          <TouchableOpacity
-            key={t}
-            style={[styles.tabBtn, tab === t && styles.tabBtnActive]}
-            onPress={() => setTab(t)}
-            activeOpacity={0.7}
-          >
-            <Text
-              style={[styles.tabBtnText, tab === t && styles.tabBtnTextActive]}
-            >
-              {t === "post" ? "일반 게시글" : "인증 게시글"}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
       {tab === "post" ? (
         <View style={styles.postSection}>
           {isLoading ? (
-            <View style={styles.center}>
-              <ActivityIndicator size="large" color={PRIMARY} />
-            </View>
+            <>{communityTabs}<View style={styles.center}><ActivityIndicator size="large" color={PRIMARY} /></View></>
           ) : postsError ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateTitle}>게시글을 불러오지 못했어요</Text>
-              <Text style={styles.emptyStateText}>잠시 후 다시 시도해주세요</Text>
-              <TouchableOpacity style={styles.retryButton} onPress={() => refetchPosts()} activeOpacity={0.75}>
-                <Text style={styles.retryButtonText}>다시 시도</Text>
-              </TouchableOpacity>
-            </View>
+            <>{communityTabs}<View style={styles.emptyState}>
+                <Text style={styles.emptyStateTitle}>게시글을 불러오지 못했어요</Text>
+                <Text style={styles.emptyStateText}>잠시 후 다시 시도해주세요</Text>
+                <TouchableOpacity style={styles.retryButton} onPress={() => refetchPosts()} activeOpacity={0.75}>
+                  <Text style={styles.retryButtonText}>다시 시도</Text>
+                </TouchableOpacity>
+              </View></>
           ) : (
-            <FlatList
-              data={posts}
+            <SectionList
+              sections={[{ data: posts }]}
               keyExtractor={(item) => item.id}
               style={{ flex: 1 }}
               contentContainerStyle={styles.postListContent}
               alwaysBounceVertical
+              stickySectionHeadersEnabled
               refreshControl={
                 <RefreshControl
                   refreshing={postsRefreshing}
@@ -224,26 +257,8 @@ export default function CommunityScreen() {
                   colors={["#FF7325"]}
                 />
               }
-              ListHeaderComponent={
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.catContent}
-                >
-                  {categoryTabs.map((c) => (
-                    <TouchableOpacity
-                      key={c.id}
-                      style={[styles.catChip, cat === c.id && styles.catChipActive]}
-                      onPress={() => setCat(c.id)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[styles.catChipText, cat === c.id && styles.catChipTextActive]}>
-                        {c.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              }
+              ListHeaderComponent={communityTabs}
+              renderSectionHeader={() => categoryBar}
               ListEmptyComponent={
                 <View style={styles.emptyState}>
                   <Text style={styles.emptyStateTitle}>아직 게시글이 없어요</Text>
@@ -264,17 +279,15 @@ export default function CommunityScreen() {
 
         </View>
       ) : challengesLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={PRIMARY} />
-        </View>
+        <>{communityTabs}<View style={styles.center}><ActivityIndicator size="large" color={PRIMARY} /></View></>
       ) : challengesError ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyStateTitle}>인증 게시글을 불러오지 못했어요</Text>
-          <Text style={styles.emptyStateText}>잠시 후 다시 시도해주세요</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={() => refetchChallenges()} activeOpacity={0.75}>
-            <Text style={styles.retryButtonText}>다시 시도</Text>
-          </TouchableOpacity>
-        </View>
+        <>{communityTabs}<View style={styles.emptyState}>
+            <Text style={styles.emptyStateTitle}>인증 게시글을 불러오지 못했어요</Text>
+            <Text style={styles.emptyStateText}>잠시 후 다시 시도해주세요</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={() => refetchChallenges()} activeOpacity={0.75}>
+              <Text style={styles.retryButtonText}>다시 시도</Text>
+            </TouchableOpacity>
+          </View></>
       ) : (
         <FlatList
           data={challenges}
@@ -292,10 +305,13 @@ export default function CommunityScreen() {
             />
           }
           ListHeaderComponent={
-            <View style={styles.certHeader}>
-              <Text style={styles.certTitle}>튜토리얼 인증</Text>
-              <Text style={styles.certNote}>완성한 순간들을 모아봤어요</Text>
-            </View>
+            <>
+              {communityTabs}
+              <View style={styles.certHeader}>
+                <Text style={styles.certTitle}>튜토리얼 인증</Text>
+                <Text style={styles.certNote}>완성한 순간들을 모아봤어요</Text>
+              </View>
+            </>
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>
@@ -368,6 +384,9 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     gap: 8,
   },
+  catBar: {
+    backgroundColor: "#FFFFFF",
+  },
   catChip: {
     height: 34,
     paddingHorizontal: 13,
@@ -426,7 +445,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   postMeta: { fontSize: 12, color: INK3, fontWeight: "600", marginBottom: 7 },
-  postBody: { fontSize: 13, color: "#55585E", lineHeight: 19 },
+  postBody: { fontSize: 13, color: "#55585E", lineHeight: 19, marginBottom: 8 },
   postFooterActions: {
     marginTop: "auto",
     flexDirection: "row",
@@ -440,6 +459,7 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   postActionText: { fontSize: 12, color: INK3, fontWeight: "600" },
+  postActionLiked: { color: PRIMARY },
   postThumbWrap: {
     width: 112,
     height: 112,

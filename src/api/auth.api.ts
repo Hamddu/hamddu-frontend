@@ -1,7 +1,7 @@
 import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.hamddu.online';
+const APP_REDIRECT_URI = 'hamddu://auth/success';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -14,11 +14,9 @@ export interface OAuthResult {
 }
 
 export async function loginWithOAuth(provider: OAuthProvider): Promise<OAuthResult> {
-  const redirectUri = Linking.createURL('auth/success');
-
   const result = await WebBrowser.openAuthSessionAsync(
-    `${API_BASE_URL}/api/auth/${provider}?app_redirect=${encodeURIComponent(redirectUri)}`,
-    redirectUri,
+    `${API_BASE_URL}/api/auth/${provider}`,
+    APP_REDIRECT_URI,
   );
 
   if (result.type !== 'success') {
