@@ -10,6 +10,7 @@ import {
   RefreshControl,
   useWindowDimensions,
   Modal,
+  Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute } from "@react-navigation/native";
@@ -170,12 +171,20 @@ export default function ChallengeDetailScreen() {
         animationType="fade"
         onRequestClose={() => setPreviewVisible(false)}
       >
-        <View style={styles.imagePreviewBackdrop}>
-          <TouchableOpacity style={styles.imagePreviewClose} onPress={() => setPreviewVisible(false)}>
-            <Ionicons name="close" size={30} color="#fff" />
-          </TouchableOpacity>
+        <Pressable
+          style={styles.imagePreviewBackdrop}
+          onPress={() => setPreviewVisible(false)}
+          accessibilityRole="button"
+          accessibilityLabel="이미지 닫기"
+        >
           {imageUrl ? <Image source={{ uri: imageUrl }} style={styles.imagePreview} resizeMode="contain" /> : null}
-        </View>
+          <View
+            style={styles.imagePreviewClose}
+            pointerEvents="none"
+          >
+            <Ionicons name="close" size={30} color="#fff" />
+          </View>
+        </Pressable>
       </Modal>
     </SafeAreaView>
   );

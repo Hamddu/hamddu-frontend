@@ -11,8 +11,10 @@ interface AuthState {
   setRefreshToken: (token: string) => void;
   setProfileRequired: (required: boolean) => void;
   setSurveyRequired: (required: boolean) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
+
+const AUTH_STORAGE_KEY = 'auth-storage';
 
 export const useAuthStore = create<AuthState>()(
   persist(
@@ -26,10 +28,13 @@ export const useAuthStore = create<AuthState>()(
       setRefreshToken: (token) => set({ refreshToken: token }),
       setProfileRequired: (required) => set({ surveyRequired: required }),
       setSurveyRequired: (required) => set({ surveyRequired: required }),
-      logout: () => set({ accessToken: null, refreshToken: null, surveyRequired: false }),
+      logout: async () => {
+        set({ accessToken: null, refreshToken: null, surveyRequired: false });
+        await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
+      },
     }),
     {
-      name: 'auth-storage',
+      name: AUTH_STORAGE_KEY,
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         accessToken: state.accessToken,

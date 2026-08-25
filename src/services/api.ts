@@ -172,7 +172,9 @@ function normalizeComment(raw: any): Comment {
     author: normalizeAuthor(raw.author),
     boardId: raw.boardId ?? raw.board?.id ?? "",
     likedByMe: raw.likedByMe ?? raw.isLiked ?? raw.liked ?? raw.hasLiked ?? false,
-    children: (raw.children ?? []).map(normalizeComment),
+    children: (Array.isArray(raw.children) ? raw.children : [])
+      .filter((child: any) => child?.id)
+      .map(normalizeComment),
   };
 }
 

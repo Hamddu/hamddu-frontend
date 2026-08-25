@@ -8,10 +8,12 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Modal,
   Image,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
@@ -134,14 +136,18 @@ export default function AddPostScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.headerButton}
-            onPress={() => navigation.goBack()}
+            onPressIn={() => {
+              Keyboard.dismiss();
+              navigation.goBack();
+            }}
             accessibilityRole="button"
             accessibilityLabel="작성 취소"
           >
@@ -252,7 +258,8 @@ export default function AddPostScreen() {
           </View>
         </ScrollView>
 
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
 
       <Modal
         visible={categoryModalVisible}

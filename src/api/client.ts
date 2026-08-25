@@ -43,7 +43,12 @@ apiClient.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config;
-    if (error.response?.status === 401 && original && !original._retry) {
+    if (error.response?.status === 401 && original) {
+      if (original._retry) {
+        await useAuthStore.getState().logout();
+        return Promise.reject(error);
+      }
+
       original._retry = true;
 
       const currentToken = useAuthStore.getState().accessToken;
@@ -57,7 +62,7 @@ apiClient.interceptors.response.use(
         original.headers.Authorization = `Bearer ${newToken}`;
         return apiClient(original);
       } catch {
-        useAuthStore.getState().logout();
+        await useAuthStore.getState().logout();
         return Promise.reject(error);
       }
     }

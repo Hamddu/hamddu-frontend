@@ -478,8 +478,7 @@ export default function HomeScreen() {
 
   const goToLesson = (lesson: Lesson, index: number) => {
     if (!lesson.videoId || !isUnlocked(index)) return;
-    setSelectedIndex(null);
-    navigation.navigate("TutorialVideo", {
+    const params = {
       videoId: lesson.videoId,
       title: lesson.title,
       lessonIndex: index,
@@ -488,7 +487,12 @@ export default function HomeScreen() {
         lesson.state === "progress" ? selectedHistory?.lastWatchedTimestamp : undefined,
       alreadyWatched: lesson.state === "done",
       alreadyCertified: certifiedContentIds.has(lesson.contentId),
-    });
+    };
+    modalDimOpacity.stopAnimation();
+    modalDimOpacity.setValue(0);
+    setIsLessonModalVisible(false);
+    setSelectedIndex(null);
+    requestAnimationFrame(() => navigation.navigate("TutorialVideo", params));
   };
 
   return (

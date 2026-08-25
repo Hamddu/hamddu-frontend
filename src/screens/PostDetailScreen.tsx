@@ -15,12 +15,12 @@ import {
   Keyboard,
   Share,
   Modal,
+  Pressable,
 } from "react-native";
 import { Text, TextInput } from "react-native-paper";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import RenderHtml from "react-native-render-html";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { useHeaderHeight } from "@react-navigation/elements";
 import type { RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -81,7 +81,6 @@ export default function PostDetailScreen() {
   const route = useRoute<PostDetailRouteProp>();
   const navigation = useNavigation<NativeStackNavigationProp<CommunityStackParamList>>();
   const { postId } = route.params;
-  const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
 
   const { data: post, isLoading: postLoading, isError: postError, isRefetching: postRefreshing, refetch: refetchPost } = usePost(postId);
@@ -257,7 +256,6 @@ export default function PostDetailScreen() {
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
-      keyboardVerticalOffset={headerHeight}
     >
       <ScrollView
         style={styles.scrollView}
@@ -501,14 +499,12 @@ export default function PostDetailScreen() {
         animationType="fade"
         onRequestClose={() => setPreviewImageIndex(null)}
       >
-        <View style={styles.imagePreviewBackdrop}>
-          <TouchableOpacity
-            style={styles.imagePreviewClose}
-            onPress={() => setPreviewImageIndex(null)}
-            accessibilityLabel="이미지 닫기"
-          >
-            <Ionicons name="close" size={30} color="#fff" />
-          </TouchableOpacity>
+        <Pressable
+          style={styles.imagePreviewBackdrop}
+          onPress={() => setPreviewImageIndex(null)}
+          accessibilityRole="button"
+          accessibilityLabel="이미지 닫기"
+        >
           {previewImageIndex !== null ? (
             <FlatList
               style={styles.imagePreviewList}
@@ -529,12 +525,18 @@ export default function PostDetailScreen() {
               )}
             />
           ) : null}
+          <View
+            style={styles.imagePreviewClose}
+            pointerEvents="none"
+          >
+            <Ionicons name="close" size={30} color="#fff" />
+          </View>
           {previewImageIndex !== null && media.length > 1 ? (
             <View style={styles.imagePreviewCount}>
               <Text style={styles.imagePreviewCountText}>{previewImageIndex + 1} / {media.length}</Text>
             </View>
           ) : null}
-        </View>
+        </Pressable>
       </Modal>
 
       <Modal visible={!!reportTarget} transparent animationType="slide" onRequestClose={() => setReportTarget(null)}>

@@ -32,6 +32,7 @@ import SurveyQuestionsScreen from "./src/screens/SurveyQuestionsScreen";
 import SplashScreen from "./src/screens/SplashScreen";
 
 import { useAuthStore } from "./src/store/authStore";
+import { getMyProfile } from "./src/api/users.api";
 import { registerForPushNotifications } from "./src/services/notifications";
 import { useCounterStore } from "./src/store/counterStore";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -383,8 +384,10 @@ function SurveyStackNavigator() {
 function RootNavigator() {
   const [hydrated, setHydrated] = useState(useAuthStore.persist.hasHydrated());
   const [splashDone, setSplashDone] = useState(false);
+  const [validatedToken, setValidatedToken] = useState<string | null>(null);
   const accessToken = useAuthStore((s) => s.accessToken);
   const surveyRequired = useAuthStore((s) => s.surveyRequired);
+  const setSurveyRequired = useAuthStore((s) => s.setSurveyRequired);
 
   useEffect(() => {
     const unsubscribe = useAuthStore.persist.onFinishHydration(() => setHydrated(true));
@@ -398,7 +401,30 @@ function RootNavigator() {
     return () => clearTimeout(splashTimer);
   }, [hydrated]);
 
-  if (!hydrated || !splashDone) return <SplashScreen />;
+  useEffect(() => {
+    if (!hydrated || !accessToken) {
+      setValidatedToken(null);
+      return;
+    }
+
+    let cancelled = false;
+    getMyProfile()
+      .then((profile) => {
+        if (!cancelled) setSurveyRequired(!profile.surveyCompleted);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setValidatedToken(accessToken);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, hydrated, setSurveyRequired]);
+
+  if (!hydrated || !splashDone || (accessToken && validatedToken !== accessToken)) {
+    return <SplashScreen />;
+  }
 
   return (
     <RootStack.Navigator screenOptions={{ headerShown: false }}>

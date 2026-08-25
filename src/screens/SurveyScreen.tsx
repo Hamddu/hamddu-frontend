@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
+  Image,
+  Alert,
   StyleSheet,
   TouchableOpacity,
   TextInput,
@@ -11,11 +13,13 @@ import {
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { nicknamesApi } from "../services/api";
-import { updateNickname, getMyProfile } from "../api/users.api";
+import { updateProfile, getMyProfile } from "../api/users.api";
+import { pickAndUploadImage, type ImageSource } from "../services/imageUpload";
 import { useAuthStore } from "../store/authStore";
 import { SurveyStackParamList } from "../types/navigation";
 
@@ -38,6 +42,9 @@ export default function SurveyScreen() {
   const [nickStatus, setNickStatus] = useState<NickStatus>("editing");
   const [isIssued, setIsIssued] = useState(false);
   const [randomCount, setRandomCount] = useState(0);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [profileMediaId, setProfileMediaId] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const autoIssued = useRef(false);
 
   // 이미 가입 완료된 유저면 설문 화면 건너뜀
@@ -66,10 +73,13 @@ export default function SurveyScreen() {
   });
 
   const registerMutation = useMutation({
-    mutationFn: async (nickname: string) => {
-      const profile = await updateNickname(nickname);
+    mutationFn: async ({ nickname, mediaId }: { nickname: string; mediaId: string | null }) => {
+      const profile = await updateProfile({
+        nickname,
+        ...(mediaId ? { profileMediaId: mediaId } : {}),
+      });
       await nicknamesApi.register(nickname).catch(() => {});
-      return profile;
+      return mediaId ? { ...profile, profileImageUrl, profileMediaId: mediaId } : profile;
     },
     onSuccess: (profile) => {
       queryClient.setQueryData(["profile", "me"], profile);
@@ -107,7 +117,7 @@ export default function SurveyScreen() {
   };
 
   const handleNickChange = (text: string) => {
-    const filtered = text.replace(/[^가-힣a-zA-Z0-9\s]/g, "");
+    const filtered = text.replace(/[^가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9\s]/g, "");
     setNick(filtered);
     setNickStatus("editing");
     setIsIssued(false);
@@ -127,11 +137,39 @@ export default function SurveyScreen() {
 
   const handleSubmit = () => {
     if (!canSubmit) return;
-    registerMutation.mutate(nick.trim());
+    registerMutation.mutate({ nickname: nick.trim(), mediaId: profileMediaId });
+  };
+
+  const uploadProfileImage = async (source: ImageSource) => {
+    setIsUploadingImage(true);
+    const result = await pickAndUploadImage(source);
+    setIsUploadingImage(false);
+    if (!result.ok) {
+      if (result.error !== "cancelled") Alert.alert("사진을 올리지 못했어요", result.error);
+      return;
+    }
+    setProfileImageUrl(result.url);
+    setProfileMediaId(result.mediaId);
+  };
+
+  const openProfileImageMenu = () => {
+    Alert.alert("프로필 사진", "사진을 선택해주세요.", [
+      { text: "사진 보관함", onPress: () => void uploadProfileImage("gallery") },
+      { text: "카메라", onPress: () => void uploadProfileImage("camera") },
+      ...(profileImageUrl ? [{
+        text: "사진 삭제",
+        style: "destructive" as const,
+        onPress: () => {
+          setProfileImageUrl(null);
+          setProfileMediaId(null);
+        },
+      }] : []),
+      { text: "취소", style: "cancel" },
+    ]);
   };
 
   const canSubmit = (nickStatus === "ok" || nickStatus === "error") && (nick ?? "").trim().length >= 2;
-  const isSubmitting = registerMutation.isPending;
+  const isSubmitting = registerMutation.isPending || isUploadingImage;
 
   const borderStyle =
     nickStatus === "duplicate" ? styles.fieldDanger
@@ -160,9 +198,27 @@ export default function SurveyScreen() {
           <Text style={styles.sub}>나중에 마이페이지에서도 바꿀 수 있어요.</Text>
 
           <View style={styles.avatarSection}>
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarEmoji}>🐹</Text>
-            </View>
+            <TouchableOpacity
+              style={styles.avatarEditor}
+              onPress={openProfileImageMenu}
+              disabled={isUploadingImage || registerMutation.isPending}
+              accessibilityRole="button"
+              accessibilityLabel="프로필 사진 설정"
+            >
+              <View style={styles.avatarCircle}>
+                {isUploadingImage ? (
+                  <ActivityIndicator color={PRIMARY} />
+                ) : profileImageUrl ? (
+                  <Image source={{ uri: profileImageUrl }} style={styles.avatarImage} />
+                ) : (
+                  <Text style={styles.avatarEmoji}>🐹</Text>
+                )}
+              </View>
+              <View style={styles.cameraBadge}>
+                <Ionicons name="camera" size={17} color="#fff" />
+              </View>
+            </TouchableOpacity>
+            <Text style={styles.profileImageHint}>프로필 사진은 선택이에요</Text>
             <TouchableOpacity
               style={[styles.randomPill, randomExhausted && styles.randomPillDisabled]}
               onPress={handleRandom}
@@ -254,11 +310,19 @@ const styles = StyleSheet.create({
   sub: { fontSize: 16, fontWeight: "500", color: HINT, lineHeight: 24, marginTop: 10 },
 
   avatarSection: { alignItems: "center", marginTop: 36, marginBottom: 36 },
+  avatarEditor: { position: "relative" },
   avatarCircle: {
     width: 132, height: 132, borderRadius: 66, backgroundColor: FILL,
-    alignItems: "center", justifyContent: "center",
+    alignItems: "center", justifyContent: "center", overflow: "hidden",
   },
+  avatarImage: { width: "100%", height: "100%" },
   avatarEmoji: { fontSize: 72 },
+  cameraBadge: {
+    position: "absolute", right: 2, bottom: 2,
+    width: 34, height: 34, borderRadius: 17, backgroundColor: PRIMARY,
+    alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#fff",
+  },
+  profileImageHint: { fontSize: 13, color: HINT, marginTop: 10, fontWeight: "500" },
   randomPill: {
     marginTop: 16, height: 40, paddingHorizontal: 18, borderRadius: 20,
     backgroundColor: FILL, alignItems: "center", justifyContent: "center", minWidth: 120,

@@ -11,6 +11,8 @@ import {
   RefreshControl,
   TextInput,
   Alert,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -153,6 +155,7 @@ export default function ProfileScreen() {
     const body = feedback.trim();
     if (!body || isSendingFeedback) return;
 
+    Keyboard.dismiss();
     setIsSendingFeedback(true);
     try {
       await feedbacksApi.create(body);
@@ -276,7 +279,7 @@ export default function ProfileScreen() {
       console.warn("Failed to unregister push notifications", error);
     } finally {
       await logoutFromApi().catch((error) => console.warn("Failed to logout from server", error));
-      logout();
+      await logout();
     }
   };
 
@@ -297,7 +300,7 @@ export default function ProfileScreen() {
               Alert.alert("탈퇴 실패", "잠시 후 다시 시도해주세요.");
               return;
             }
-            logout();
+            await logout();
           },
         },
       ],
@@ -591,7 +594,8 @@ export default function ProfileScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setFeedbackModalVisible(false)}
       >
-        <SafeAreaView style={styles.feedbackSafeArea}>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <SafeAreaView style={styles.feedbackSafeArea}>
           <View style={styles.feedbackHeader}>
             <View>
               <Text style={styles.feedbackTitle}>어떤 점을 바꿔볼까요?</Text>
@@ -639,7 +643,8 @@ export default function ProfileScreen() {
             </TouchableOpacity>
             <Text style={styles.feedbackPrivacy}>보내주신 의견은 서비스 개선에만 사용돼요.</Text>
           </View>
-        </SafeAreaView>
+          </SafeAreaView>
+        </TouchableWithoutFeedback>
       </Modal>
 
       <Modal
