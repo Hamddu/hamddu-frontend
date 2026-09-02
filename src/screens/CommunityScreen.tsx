@@ -18,6 +18,7 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
 import { usePosts, useToggleLike } from "../hooks/usePosts";
+import { useRequireLogin } from "../hooks/useRequireLogin";
 import { Post } from "../store/postStore";
 import { categoriesApi, challengesApi, Challenge } from "../services/api";
 import { CommunityStackParamList } from "../types/navigation";
@@ -184,6 +185,7 @@ export default function CommunityScreen() {
     queryFn: challengesApi.getChallenges,
   });
   const { toggle: toggleLike } = useToggleLike();
+  const { requireLogin } = useRequireLogin();
   const categoryTabs = [{ id: "all", label: "전체" }, ...categories];
   const { width } = useWindowDimensions();
   const certTileSize = Math.floor((width - 40 - 16) / 3);
@@ -271,7 +273,10 @@ export default function CommunityScreen() {
                   onPress={() =>
                     navigation.navigate("PostDetail", { postId: item.id })
                   }
-                  onLike={() => toggleLike(item)}
+                  onLike={() => {
+                    if (!requireLogin("좋아요를 누르려면")) return;
+                    toggleLike(item);
+                  }}
                 />
               )}
             />
@@ -332,7 +337,10 @@ export default function CommunityScreen() {
       {tab === "post" && (
         <TouchableOpacity
           style={styles.fab}
-          onPress={() => navigation.navigate("AddPost")}
+          onPress={() => {
+            if (!requireLogin("글을 쓰려면")) return;
+            navigation.navigate("AddPost");
+          }}
           activeOpacity={0.85}
         >
           <Ionicons name="add" size={20} color="#fff" />

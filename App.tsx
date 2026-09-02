@@ -30,6 +30,10 @@ import LoginScreen from "./src/screens/LoginScreen";
 import SurveyScreen from "./src/screens/SurveyScreen";
 import SurveyQuestionsScreen from "./src/screens/SurveyQuestionsScreen";
 import SplashScreen from "./src/screens/SplashScreen";
+import {
+  HomeLoginRequiredScreen,
+  ProfileLoginRequiredScreen,
+} from "./src/screens/LoginRequiredScreen";
 
 import { useAuthStore } from "./src/store/authStore";
 import { getMyProfile } from "./src/api/users.api";
@@ -99,6 +103,18 @@ function TabIcon({
 }
 
 function HomeStackNavigator() {
+  const isGuest = useAuthStore((s) => s.isGuest);
+  const accessToken = useAuthStore((s) => s.accessToken);
+
+  // 튜토리얼 시청과 이어보기 기록은 계정에 묶이므로 게스트에게는 로그인 안내를 보여준다.
+  if (isGuest && !accessToken) {
+    return (
+      <HomeStack.Navigator screenOptions={{ headerShown: false }}>
+        <HomeStack.Screen name="TutorialList" component={HomeLoginRequiredScreen} />
+      </HomeStack.Navigator>
+    );
+  }
+
   return (
     <HomeStack.Navigator>
       <HomeStack.Screen
@@ -171,6 +187,17 @@ function CommunityStackNavigator() {
 }
 
 function ProfileStackNavigator() {
+  const isGuest = useAuthStore((s) => s.isGuest);
+  const accessToken = useAuthStore((s) => s.accessToken);
+
+  if (isGuest && !accessToken) {
+    return (
+      <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
+        <ProfileStack.Screen name="MyProfile" component={ProfileLoginRequiredScreen} />
+      </ProfileStack.Navigator>
+    );
+  }
+
   return (
     <ProfileStack.Navigator
       screenOptions={({ navigation }) => ({
@@ -223,8 +250,14 @@ function FloatingTabBackground() {
 }
 
 function MainTabs() {
+  const isGuest = useAuthStore((s) => s.isGuest);
+  const accessToken = useAuthStore((s) => s.accessToken);
+
   return (
     <Tab.Navigator
+      // 게스트는 홈 대신 바로 볼 수 있는 커뮤니티로 진입시킨다 — 첫 화면이 로그인 안내면
+      // 로그인 강제와 다를 게 없다.
+      initialRouteName={isGuest && !accessToken ? "Community" : "Home"}
       detachInactiveScreens={false}
       screenOptions={({ route }) => {
         const nestedRoute = getFocusedRouteNameFromRoute(route);
@@ -386,6 +419,7 @@ function RootNavigator() {
   const [splashDone, setSplashDone] = useState(false);
   const [validatedToken, setValidatedToken] = useState<string | null>(null);
   const accessToken = useAuthStore((s) => s.accessToken);
+  const isGuest = useAuthStore((s) => s.isGuest);
   const surveyRequired = useAuthStore((s) => s.surveyRequired);
   const setSurveyRequired = useAuthStore((s) => s.setSurveyRequired);
 
@@ -428,9 +462,9 @@ function RootNavigator() {
 
   return (
     <RootStack.Navigator screenOptions={{ headerShown: false }}>
-      {!accessToken ? (
+      {!accessToken && !isGuest ? (
         <RootStack.Screen name="Login" component={LoginScreen} />
-      ) : surveyRequired ? (
+      ) : accessToken && surveyRequired ? (
         <RootStack.Screen name="SurveyFlow" component={SurveyStackNavigator} />
       ) : (
         <RootStack.Screen name="Main" component={MainTabs} />

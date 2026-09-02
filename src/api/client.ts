@@ -44,6 +44,12 @@ apiClient.interceptors.response.use(
   async (error) => {
     const original = error.config;
     if (error.response?.status === 401 && original) {
+      // 게스트(둘러보기)는 애초에 세션이 없다. logout()을 부르면 isGuest까지 지워져
+      // 로그인 화면으로 튕기므로, 계정이 필요한 요청이었다고 보고 에러만 돌려준다.
+      if (!useAuthStore.getState().accessToken) {
+        return Promise.reject(error);
+      }
+
       if (original._retry) {
         await useAuthStore.getState().logout();
         return Promise.reject(error);
