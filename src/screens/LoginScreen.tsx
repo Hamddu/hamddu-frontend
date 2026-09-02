@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as AppleAuthentication from "expo-apple-authentication";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import LoginCharacter from "../../assets/login/character.svg";
 import LoginFire from "../../assets/login/fire.svg";
@@ -20,26 +21,47 @@ import NaverIcon from "../../assets/login/naver.svg";
 import YarnBottom from "../../assets/login/yarn-bottom.svg";
 import YarnLeft from "../../assets/login/yarn-left.svg";
 import YarnTop from "../../assets/login/yarn-top.svg";
-import { loginWithOAuth } from "../api/auth.api";
+import { isAppleLoginAvailable, loginWithApple, loginWithOAuth } from "../api/auth.api";
 import { PRIVACY_POLICY, TERMS_OF_SERVICE } from "../constants/legal";
 import { useAuthStore } from "../store/authStore";
 
 const GOOGLE_ICON = require("../../assets/login/google.png");
 
+type Provider = "apple" | "google" | "naver";
+
 export default function LoginScreen() {
-  const [loading, setLoading] = useState<"google" | "naver" | null>(null);
+  const [loading, setLoading] = useState<Provider | null>(null);
   const [legalDocument, setLegalDocument] = useState<"terms" | "privacy" | null>(null);
+  const [appleAvailable, setAppleAvailable] = useState(false);
   const setSession = useAuthStore((state) => state.setSession);
+  const enterGuestMode = useAuthStore((state) => state.enterGuestMode);
   const { width, height } = useWindowDimensions();
   const scale = Math.min(width / 451, height / 980);
 
-  async function handleLogin(provider: "google" | "naver") {
+  // iOS 13 미만이나 안드로이드에서는 Apple 버튼을 띄우지 않는다.
+  useEffect(() => {
+    let cancelled = false;
+    isAppleLoginAvailable()
+      .then((available) => {
+        if (!cancelled) setAppleAvailable(available);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function handleLogin(provider: Provider) {
     setLoading(provider);
     try {
-      const { accessToken, refreshToken, surveyRequired } = await loginWithOAuth(provider);
+      const { accessToken, refreshToken, surveyRequired } =
+        provider === "apple" ? await loginWithApple() : await loginWithOAuth(provider);
       setSession(accessToken, refreshToken, surveyRequired);
     } catch (e: any) {
-      Alert.alert("로그인 실패", e.message ?? "다시 시도해주세요.");
+      // 사용자가 직접 취소한 경우까지 실패 알럿을 띄우지는 않는다.
+      if (e?.message !== "로그인이 취소되었습니다.") {
+        Alert.alert("로그인 실패", e.message ?? "다시 시도해주세요.");
+      }
     } finally {
       setLoading(null);
     }
@@ -77,6 +99,18 @@ export default function LoginScreen() {
       </View>
 
       <View style={[styles.actions, { paddingHorizontal: 30 * scale, paddingBottom: 55 * scale, gap: 10 * scale }]}>
+        {appleAvailable && (
+          <AppleAuthentication.AppleAuthenticationButton
+            buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+            cornerRadius={30 * scale}
+            style={buttonSize}
+            onPress={() => {
+              if (!loading) void handleLogin("apple");
+            }}
+          />
+        )}
+
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="구글로 계속하기"
@@ -118,7 +152,18 @@ export default function LoginScreen() {
           )}
         </TouchableOpacity>
 
-        <Text style={[styles.terms, { fontSize: 15 * scale, lineHeight: 20 * scale, marginTop: 32 * scale }]}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="로그인 없이 둘러보기"
+          activeOpacity={0.6}
+          disabled={!!loading}
+          onPress={enterGuestMode}
+          style={[styles.guestButton, { height: 52 * scale, marginTop: 6 * scale }]}
+        >
+          <Text style={[styles.guestButtonText, { fontSize: 17 * scale }]}>로그인 없이 둘러보기</Text>
+        </TouchableOpacity>
+
+        <Text style={[styles.terms, { fontSize: 15 * scale, lineHeight: 20 * scale, marginTop: 18 * scale }]}>
           가입하면 <Text accessibilityRole="link" style={styles.termsLink} onPress={() => setLegalDocument("terms")}>이용약관</Text>과{" "}
           <Text accessibilityRole="link" style={styles.termsLink} onPress={() => setLegalDocument("privacy")}>개인정보처리방침</Text>에 동의하게 돼요
         </Text>
@@ -211,6 +256,16 @@ const styles = StyleSheet.create({
     letterSpacing: -0.4,
   },
   naverText: { color: "#FFFFFF" },
+  guestButton: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  guestButtonText: {
+    color: "rgba(0,0,0,0.5)",
+    fontWeight: "700",
+    letterSpacing: -0.4,
+    textDecorationLine: "underline",
+  },
   terms: {
     color: "rgba(0,0,0,0.3)",
     fontWeight: "500",

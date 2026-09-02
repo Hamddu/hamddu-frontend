@@ -15,11 +15,14 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.hamddu.app",
       "googleServicesFile": "./GoogleService-Info.plist",
+      "usesAppleSignIn": true,
       "entitlements": {
         "aps-environment": "$(APS_ENVIRONMENT)"
       },
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleDevelopmentRegion": "ko",
+        "CFBundleLocalizations": ["ko", "en"]
       }
     },
     "android": {
@@ -39,9 +42,12 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "앱에서 사진을 선택하기 위해 권한이 필요합니다."
+          "photosPermission": "기기에 저장된 뜨개 작품 사진을 커뮤니티 게시글, 챌린지 인증 사진, 프로필 사진으로 등록할 수 있도록 사진 보관함에 접근합니다. 회원님이 직접 고른 사진만 업로드되며 보관함의 다른 사진은 읽지 않습니다.",
+          "cameraPermission": "완성한 뜨개 작품을 그 자리에서 촬영해 커뮤니티 게시글, 챌린지 인증 사진, 프로필 사진으로 등록할 수 있도록 카메라를 사용합니다. 촬영한 사진은 회원님이 등록을 선택한 게시물에만 업로드됩니다.",
+          "microphonePermission": false
         }
       ],
+      "expo-apple-authentication",
       "expo-web-browser",
       [
         "expo-notifications",

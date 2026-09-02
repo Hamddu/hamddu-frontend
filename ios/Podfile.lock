@@ -218,6 +218,8 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
+  - ExpoAppleAuthentication (55.0.17):
+    - ExpoModulesCore
   - ExpoAsset (55.0.19):
     - ExpoModulesCore
   - ExpoBlur (55.0.17):
@@ -3232,6 +3234,7 @@ DEPENDENCIES:
   - expo-dev-launcher (from `../node_modules/expo-dev-launcher`)
   - expo-dev-menu (from `../node_modules/expo-dev-menu`)
   - expo-dev-menu-interface (from `../node_modules/expo-dev-menu-interface/ios`)
+  - ExpoAppleAuthentication (from `../node_modules/expo-apple-authentication/ios`)
   - ExpoAsset (from `../node_modules/expo-asset/ios`)
   - ExpoBlur (from `../node_modules/expo-blur/ios`)
   - ExpoClipboard (from `../node_modules/expo-clipboard/ios`)
@@ -3381,6 +3384,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-dev-menu"
   expo-dev-menu-interface:
     :path: "../node_modules/expo-dev-menu-interface/ios"
+  ExpoAppleAuthentication:
+    :path: "../node_modules/expo-apple-authentication/ios"
   ExpoAsset:
     :path: "../node_modules/expo-asset/ios"
   ExpoBlur:
@@ -3605,6 +3610,7 @@ SPEC CHECKSUMS:
   expo-dev-launcher: 66b6a0c60997fb44727281017ed24247a691bd0c
   expo-dev-menu: cf846b46b7b7e2598814d666544c52ad6600ed43
   expo-dev-menu-interface: 833795f4c98a674d36cbc12b11b21756c38e01e8
+  ExpoAppleAuthentication: a609c7b8d44e28b5661842c9cc03c2121c305e4a
   ExpoAsset: 3ed03b277e3c0d095671a6fdaaf158cb275361a0
   ExpoBlur: 1050576a9c8bd37c8e800852a981ab56b737e353
   ExpoClipboard: 22455e54ebf6fce0886e322827e67f5eab9dfa07

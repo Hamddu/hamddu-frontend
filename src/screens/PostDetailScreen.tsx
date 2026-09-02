@@ -27,6 +27,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { useDeletePost, usePost, useToggleLike } from "../hooks/usePosts";
 import { useComments, useAddComment, useDeleteComment, useToggleCommentLike } from "../hooks/useComments";
+import { useRequireLogin } from "../hooks/useRequireLogin";
 import { CommunityStackParamList } from "../types/navigation";
 import CommentItem from "../components/CommentItem";
 import { getMyProfile } from "../api/users.api";
@@ -91,7 +92,13 @@ export default function PostDetailScreen() {
     isRefetching: commentsRefreshing,
     refetch: refetchComments,
   } = useComments(postId);
-  const { data: myProfile } = useQuery({ queryKey: ["profile", "me"], queryFn: getMyProfile });
+  const { isLoggedIn, requireLogin } = useRequireLogin();
+  // 게스트는 프로필이 없으므로 401이 뻔한 요청을 아예 보내지 않는다.
+  const { data: myProfile } = useQuery({
+    queryKey: ["profile", "me"],
+    queryFn: getMyProfile,
+    enabled: isLoggedIn,
+  });
   const { toggle: toggleLike } = useToggleLike();
   const deletePostMutation = useDeletePost();
   const addCommentMutation = useAddComment();
@@ -132,10 +139,12 @@ export default function PostDetailScreen() {
   });
 
   const handleLikePress = () => {
+    if (!requireLogin("좋아요를 누르려면")) return;
     if (post) toggleLike(post);
   };
 
   const handleAddComment = () => {
+    if (!requireLogin("댓글을 쓰려면")) return;
     if (!commentText.trim()) return;
     addCommentMutation.mutate(
       { postId, body: commentText, parentId: replyTo?.id },
@@ -188,6 +197,7 @@ export default function PostDetailScreen() {
   };
 
   const openReportDialog = (target: ReportTarget) => {
+    if (!requireLogin("신고하려면")) return;
     setReportTarget(target);
     setReportReason("spam");
     setReportDescription("");
@@ -434,7 +444,10 @@ export default function PostDetailScreen() {
                     profileImageUrl: myProfile.profileImageUrl,
                   } : undefined}
                   onDelete={handleDeleteComment}
-                  onLike={(comment) => toggleCommentLikeMutation.mutate({ postId, comment })}
+                  onLike={(comment) => {
+                    if (!requireLogin("좋아요를 누르려면")) return;
+                    toggleCommentLikeMutation.mutate({ postId, comment });
+                  }}
                   onReply={(comment, parentId) =>
                     setReplyTo({
                       id: parentId,

@@ -20,6 +20,7 @@
     "@tanstack/react-virtual": "^3.13.16",
     "axios": "^1.15.2",
     "expo": "~55.0.29",
+    "expo-apple-authentication": "~55.0.17",
     "expo-blur": "~55.0.17",
     "expo-build-properties": "~55.0.16",
     "expo-clipboard": "~55.0.16",
